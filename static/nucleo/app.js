@@ -199,7 +199,47 @@ const Icone = {
   alerta:   svg('<path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/>' +
                 '<path d="M12 9v4M12 17h.01"/>'),
   relogio:  svg('<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>'),
+  pontos:   svg('<circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/>' +
+                '<circle cx="12" cy="19" r="1"/>'),
+  lapis:    svg('<path d="M17 3a2.8 2.8 0 114 4L7.5 20.5 2 22l1.5-5.5z"/>'),
+  caixa:    svg('<path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4"/>'),
+  lixo:     svg('<path d="M3 6h18M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2m3 0v14' +
+                'a1 1 0 01-1 1H6a1 1 0 01-1-1V6"/>'),
+  voltar:   svg('<path d="M3 7v6h6M3.5 13a9 9 0 102-6"/>'),
 };
+
+/* ---------- menu suspenso ---------- */
+const Menu = {
+  abre(alvo, itens){
+    Menu.fecha();
+    const m = document.createElement('div');
+    m.className = 'menu-flut';
+    m.innerHTML = itens.map((i, n) => i.sep
+      ? '<div class="menu-sep"></div>'
+      : '<button data-i="' + n + '"' + (i.perigo ? ' class="perigo"' : '') + '>' +
+        (i.icone ? Icone[i.icone] : '') + Fmt.escapa(i.txt) + '</button>').join('');
+    document.body.appendChild(m);
+
+    const r = alvo.getBoundingClientRect();
+    m.style.top  = (r.bottom + window.scrollY + 6) + 'px';
+    const larg = m.offsetWidth || 210;
+    m.style.left = Math.max(8, Math.min(r.right + window.scrollX - larg,
+      window.innerWidth - larg - 8)) + 'px';
+
+    m.addEventListener('click', ev => {
+      const b = ev.target.closest('button[data-i]');
+      if (!b) return;
+      ev.stopPropagation();
+      const it = itens[Number(b.dataset.i)];
+      Menu.fecha();
+      it.fn && it.fn();
+    });
+    setTimeout(() => document.addEventListener('click', Menu.fecha, {once:true}), 0);
+    return m;
+  },
+  fecha(){ $$('.menu-flut').forEach(m => m.remove()); },
+};
+window.addEventListener('scroll', () => Menu.fecha(), true);
 
 /* ---------- confirmacao ---------- */
 function confirma(titulo, texto, onSim, rotulo = 'Confirmar') {

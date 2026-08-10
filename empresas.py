@@ -119,7 +119,7 @@ def criar(dados: NovaEmpresa, request: Request, u=Depends(auth.exige("empresa_es
     return emp
 
 @router.get("")
-def listar(u=Depends(auth.usuario_atual)):
+def listar(arquivadas: bool = False, u=Depends(auth.usuario_atual)):
     """Lista com indicadores do mes corrente. Uma query agregada, nao uma por empresa."""
     ids = [e["id"] for e in auth.empresas_visiveis(u)]
     if not ids:
@@ -159,14 +159,16 @@ def listar(u=Depends(auth.usuario_atual)):
              cur.ultima_sync, cur.nsu_nfe, cur.nsu_cte,
              COALESCE(cur.pausado,FALSE) AS pausado,
              cf.janela_ativa, cf.janela_inicio, cf.janela_fim,
-             cf.ciencia_auto, cf.janela_herdada, cf.ciencia_herdada
+             cf.ciencia_auto, cf.janela_herdada, cf.ciencia_herdada,
+             e.arquivada_em, (e.arquivada_em IS NOT NULL) AS arquivada
       FROM empresas e
       LEFT JOIN certificados c ON c.empresa_id=e.id AND c.ativo
       LEFT JOIN mes m   ON m.empresa_id=e.id
       LEFT JOIN cur     ON cur.empresa_id=e.id
       LEFT JOIN config_efetiva cf ON cf.empresa_id=e.id
       WHERE e.id = ANY(%(ids)s)
-      ORDER BY e.razao_social""", {"ids": ids})
+        AND (%(arq)s OR e.arquivada_em IS NULL)
+      ORDER BY e.razao_social""", {"ids": ids, "arq": arquivadas})
 
 
 class ConfigSync(BaseModel):
@@ -212,6 +214,134 @@ def salva_config_escritorio(dados: ConfigSync, request: Request,
        dados.janela_fim or None, bool(dados.ciencia_auto), u["contabilidade_id"]))
     _aud(u, "config_escritorio", None, dados.model_dump(), request)
     return {"ok": True}
+
+class EditaEmpresa(BaseModel):
+    nome_fantasia: Optional[str] = None
+    ie: Optional[str] = None
+    im: Optional[str] = None
+    regime_tributario: Optional[str] = None
+    observacoes: Optional[str] = None
+
+@router.put("/{empresa_id}")
+def editar(empresa_id: int, dados: EditaEmpresa, request: Request,
+           u=Depends(auth.exige("empresa_escrever"))):
+    """Edita apenas o que nao vem da Receita Federal."""
+    auth.exige_empresa(u, empresa_id)
+    q("""UPDATE empresas SET nome_fantasia=%s, ie=%s, im=%s,
+         regime_tributario=%s, observacoes=%s, atualizado_em=NOW()
+         WHERE id=%s""",
+      (dados.nome_fantasia or None, dados.ie or None, dados.im or None,
+       dados.regime_tributario or None, dados.observacoes or None, empresa_id))
+    _aud(u, "empresa_editada", empresa_id, dados.model_dump(), request)
+    return q("""SELECT id,razao_social,nome_fantasia,ie,im,regime_tributario,observacoes
+                FROM empresas WHERE id=%s""", (empresa_id,), one=True)
+
+
+@router.post("/{empresa_id}/atualizar-receita")
+def atualizar_receita(empresa_id: int, request: Request,
+                      u=Depends(auth.exige("empresa_escrever"))):
+    """Reconsulta a Receita e atualiza os campos oficiais."""
+    auth.exige_empresa(u, empresa_id)
+    emp = q("SELECT cnpj FROM empresas WHERE id=%s", (empresa_id,), one=True)
+    try:
+        d = receita.consulta(emp["cnpj"], conn_q=q)
+    except ValueError as e:
+        raise HTTPException(404, str(e))
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+
+    import json
+    q("""UPDATE empresas SET razao_social=%s, municipio_ibge=%s, municipio_nome=%s,
+         uf=%s, matriz_filial=%s, situacao_cadastral=%s, situacao_data=%s,
+         situacao_motivo=%s, abertura=%s, natureza_juridica=%s, porte=%s,
+         capital_social=%s, cnae_principal=%s, cnae_principal_desc=%s,
+         logradouro=%s, numero=%s, complemento=%s, bairro=%s, cep=%s,
+         telefone1=%s, telefone2=%s, email=%s, simples_optante=%s,
+         simples_desde=%s, simples_ate=%s, mei_optante=%s, mei_desde=%s,
+         receita_bruto=%s, receita_fonte=%s, receita_consultado_em=NOW(),
+         atualizado_em=NOW() WHERE id=%s""",
+      (d["razao_social"], d["municipio_ibge"], d["municipio_nome"], d["uf"],
+       d["matriz_filial"], d["situacao_cadastral"], d["situacao_data"],
+       d["situacao_motivo"], d["abertura"], d["natureza_juridica"], d["porte"],
+       d["capital_social"], d["cnae_principal"], d["cnae_principal_desc"],
+       d["logradouro"], d["numero"], d["complemento"], d["bairro"], d["cep"],
+       d["telefone1"], d["telefone2"], d["email"], d["simples_optante"],
+       d["simples_desde"], d["simples_ate"], d["mei_optante"], d["mei_desde"],
+       json.dumps(d["bruto"]), d["fonte"], empresa_id))
+
+    q("DELETE FROM empresa_cnaes WHERE empresa_id=%s", (empresa_id,))
+    if d["cnae_principal"]:
+        q("""INSERT INTO empresa_cnaes (empresa_id,codigo,descricao,principal)
+             VALUES (%s,%s,%s,TRUE)""",
+          (empresa_id, d["cnae_principal"], d["cnae_principal_desc"]))
+    for cn in d["cnaes"]:
+        q("""INSERT INTO empresa_cnaes (empresa_id,codigo,descricao,principal)
+             VALUES (%s,%s,%s,FALSE)""", (empresa_id, cn["codigo"], cn["descricao"]))
+    q("DELETE FROM empresa_socios WHERE empresa_id=%s", (empresa_id,))
+    for so in d["socios"]:
+        q("""INSERT INTO empresa_socios
+             (empresa_id,nome,documento,qualificacao,faixa_etaria,entrada,pais,
+              representante_nome,representante_doc,representante_qualif)
+             VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+          (empresa_id, so["nome"], so["documento"], so["qualificacao"],
+           so["faixa_etaria"], so["entrada"], so["pais"], so["representante_nome"],
+           so["representante_doc"], so["representante_qualif"]))
+
+    _aud(u, "empresa_atualizada_receita", empresa_id, {"fonte": d["fonte"]}, request)
+    return {"ok": True, "fonte": d["fonte"],
+            "situacao": d["situacao_cadastral"], "razao_social": d["razao_social"]}
+
+
+class Arquivar(BaseModel):
+    motivo: Optional[str] = None
+
+@router.post("/{empresa_id}/arquivar")
+def arquivar(empresa_id: int, dados: Arquivar, request: Request,
+             u=Depends(auth.exige("empresa_escrever"))):
+    """Arquiva: some da lista e para de sincronizar. Nenhum dado e apagado."""
+    auth.exige_empresa(u, empresa_id)
+    e = q("SELECT razao_social, arquivada_em FROM empresas WHERE id=%s",
+          (empresa_id,), one=True)
+    if e["arquivada_em"]:
+        raise HTTPException(400, "Esta empresa ja esta arquivada.")
+    q("""UPDATE empresas SET arquivada_em=NOW(), arquivada_por=%s,
+         arquivada_motivo=%s, status='arquivada' WHERE id=%s""",
+      (u["id"], dados.motivo, empresa_id))
+    q("""UPDATE cursores_dfe SET pausado=TRUE,
+         pausado_motivo='Empresa arquivada' WHERE empresa_id=%s""", (empresa_id,))
+    _aud(u, "empresa_arquivada", empresa_id, {"motivo": dados.motivo}, request)
+    return {"ok": True, "razao_social": e["razao_social"]}
+
+
+@router.post("/{empresa_id}/restaurar")
+def restaurar(empresa_id: int, request: Request,
+              u=Depends(auth.exige("empresa_escrever"))):
+    auth.exige_empresa(u, empresa_id)
+    q("""UPDATE empresas SET arquivada_em=NULL, arquivada_por=NULL,
+         arquivada_motivo=NULL, status='ativa' WHERE id=%s""", (empresa_id,))
+    q("""UPDATE cursores_dfe SET pausado=FALSE, pausado_motivo=NULL
+         WHERE empresa_id=%s AND pausado_motivo='Empresa arquivada'""", (empresa_id,))
+    _aud(u, "empresa_restaurada", empresa_id, None, request)
+    return {"ok": True}
+
+
+@router.delete("/{empresa_id}")
+def excluir(empresa_id: int, confirmacao: str, request: Request,
+            u=Depends(auth.exige("admin"))):
+    """Exclusao definitiva. Superadmin apenas, exige o CNPJ como confirmacao."""
+    e = q("SELECT cnpj, razao_social FROM empresas WHERE id=%s", (empresa_id,), one=True)
+    if not e:
+        raise HTTPException(404, "Empresa nao encontrada")
+    if receita.limpa(confirmacao) != e["cnpj"]:
+        raise HTTPException(400, "Confirmacao invalida: digite o CNPJ da empresa.")
+    q("""INSERT INTO auditoria (usuario_id,contabilidade_id,acao,detalhe,ip)
+         VALUES (%s,%s,'empresa_excluida',%s,%s)""",
+      (u["id"], u["contabilidade_id"],
+       __import__("json").dumps({"cnpj": e["cnpj"], "razao_social": e["razao_social"]}),
+       request.client.host if request.client else None))
+    q("DELETE FROM empresas WHERE id=%s", (empresa_id,))
+    return {"ok": True}
+
 
 @router.get("/{empresa_id}")
 def detalhe(empresa_id: int, u=Depends(auth.usuario_atual)):

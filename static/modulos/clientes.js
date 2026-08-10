@@ -104,8 +104,12 @@ const cartao = e => {
       '<span>' + Fmt.escapa(e.municipio_nome || '—') + (e.uf ? '/' + e.uf : '') +
         (e.cert_ate ? ' · vence <b style="color:var(--txt)">' + Fmt.data(e.cert_ate) +
         '</b>' : '') + '</span>' +
-      '<span class="empurra colunas" style="color:var(--acao);gap:4px;' +
-        'font-weight:var(--p-forte)">Abrir' + Icone.seta + '</span>' +
+      '<span class="empurra colunas" style="gap:var(--e-4)">' +
+        (Sessao.pode('empresa_escrever') ?
+        '<button class="acao-txt" data-parar data-acoes="' + e.id + '">' +
+          Icone.lapis + 'Editar</button>' : '') +
+        '<span class="acao-txt">Abrir' + Icone.seta + '</span>' +
+      '</span>' +
     '</div></div>';
 };
 
@@ -135,6 +139,9 @@ const COLUNAS = [
   {k:'ultima_sync', t:'Última sinc.', w:120, cel: e =>
     '<span class="' + (parado(e) ? 't3' : '') + '">' +
       (e.pausado ? 'Pausado' : Fmt.relativo(e.ultima_sync)) + '</span>'},
+  {k:'acoes', t:'', w:52, cel: e =>
+    '<button class="btn btn-3 btn-icone btn-sm" data-parar data-acoes="' + e.id +
+      '" aria-label="Ações">' + Icone.pontos + '</button>'},
 ];
 
 /* ---------- nova empresa ---------- */
@@ -242,6 +249,13 @@ async function carregar(){
   GRID.barra('#barra', {placeholder:'Buscar por razão social, CNPJ ou município...'});
 
   $('#area').addEventListener('click', ev => {
+    const a = ev.target.closest('[data-acoes]');
+    if (a) {
+      ev.stopPropagation();
+      const emp = DADOS.find(x => String(x.id) === a.dataset.acoes);
+      if (emp) menuEmpresa(a, emp);
+      return;
+    }
     const c = ev.target.closest('[data-cert]');
     if (c) { ev.stopPropagation(); toast('Módulo de certificado em construção.'); }
   });
@@ -249,3 +263,177 @@ async function carregar(){
   try { await carregar(); }
   catch(e) { toast.erro(e.message); }
 })();
+
+/* ---------- acoes da empresa ---------- */
+function menuEmpresa(botao, e){
+  const itens = [];
+  if (Sessao.pode('empresa_escrever')) {
+    itens.push({txt:'Editar dados', icone:'lapis', fn:() => modalEditar(e)});
+    itens.push({txt:'Atualizar pela Receita', icone:'sync', fn:() => atualizarReceita(e)});
+    itens.push({txt:'Sincronização', icone:'relogio', fn:() => modalSync(e)});
+    itens.push({sep:true});
+  }
+  itens.push({txt:'Abrir empresa', icone:'seta',
+    fn:() => { Sessao.empresaId = e.id; location.href = '/empresa'; }});
+  if (Sessao.pode('empresa_escrever')) {
+    itens.push({sep:true});
+    itens.push(e.arquivada
+      ? {txt:'Restaurar', icone:'voltar', fn:() => restaurar(e)}
+      : {txt:'Arquivar', icone:'caixa', perigo:true, fn:() => modalArquivar(e)});
+  }
+  Menu.abre(botao, itens);
+}
+
+function modalEditar(e){
+  Modal.cria({
+    id:'m-editar', titulo:'Editar ' + (e.nome_fantasia || e.razao_social),
+    corpo:
+      '<div class="aviso aviso-erro" id="ed-erro"></div>' +
+      '<p class="dica" style="margin:0 0 var(--e-4)">Razão social, CNPJ, município e ' +
+        'porte vêm da Receita Federal e não são editáveis aqui.</p>' +
+      '<div class="grupo"><label class="rotulo" for="ed-fantasia">Nome fantasia</label>' +
+        '<input class="campo" id="ed-fantasia" value="' +
+          Fmt.escapa(e.nome_fantasia || '') + '"></div>' +
+      '<div class="colunas" style="gap:var(--e-3);align-items:flex-start">' +
+        '<div class="grupo" style="flex:1"><label class="rotulo" for="ed-ie">' +
+          'Inscrição estadual</label><input class="campo" id="ed-ie" value="' +
+          Fmt.escapa(e.ie || '') + '"></div>' +
+        '<div class="grupo" style="flex:1"><label class="rotulo" for="ed-im">' +
+          'Inscrição municipal</label><input class="campo" id="ed-im" value="' +
+          Fmt.escapa(e.im || '') + '"></div>' +
+      '</div>' +
+      '<div class="grupo"><label class="rotulo" for="ed-regime">Regime tributário</label>' +
+        '<select class="campo" id="ed-regime">' +
+        ['','Simples Nacional','Lucro Presumido','Lucro Real','MEI','Imune ou isenta']
+          .map(o => '<option' + (o === (e.regime_tributario || '') ? ' selected' : '') +
+            '>' + o + '</option>').join('') + '</select></div>' +
+      '<div class="grupo"><label class="rotulo" for="ed-obs">Observações</label>' +
+        '<textarea class="campo" id="ed-obs">' +
+          Fmt.escapa(e.observacoes || '') + '</textarea></div>',
+    acoes:[
+      {txt:'Cancelar', cls:'btn-2'},
+      {txt:'Salvar', cls:'btn-1', id:'ed-salvar', fn:async () => {
+        const b = $('#ed-salvar'); b.disabled = true; b.textContent = 'Salvando...';
+        try {
+          await api.put('/api/empresas/' + e.id, {
+            nome_fantasia: $('#ed-fantasia').value.trim(),
+            ie: $('#ed-ie').value.trim(), im: $('#ed-im').value.trim(),
+            regime_tributario: $('#ed-regime').value,
+            observacoes: $('#ed-obs').value.trim(),
+          });
+          Modal.fecha('m-editar'); toast.ok('Dados atualizados.'); await carregar();
+        } catch(err) {
+          const a = $('#ed-erro'); a.textContent = err.message; a.classList.add('on');
+        } finally { b.disabled = false; b.textContent = 'Salvar'; }
+      }},
+    ],
+  });
+  Modal.abre('m-editar');
+}
+
+async function atualizarReceita(e){
+  toast('Consultando a Receita Federal...');
+  try {
+    const r = await api.post('/api/empresas/' + e.id + '/atualizar-receita', {});
+    toast.ok('Atualizado · ' + r.situacao);
+    await carregar();
+  } catch(err) { toast.erro(err.message); }
+}
+
+function modalSync(e){
+  const herda = e.janela_herdada && e.ciencia_herdada;
+  Modal.cria({
+    id:'m-sync', titulo:'Sincronização · ' + (e.nome_fantasia || e.razao_social),
+    corpo:
+      '<div class="aviso aviso-erro" id="sy-erro"></div>' +
+      '<label class="colunas" style="gap:var(--e-2);margin-bottom:var(--e-5);' +
+        'cursor:pointer"><input type="checkbox" id="sy-herda"' +
+        (herda ? ' checked' : '') + '>' +
+        '<span>Usar o padrão do escritório</span></label>' +
+      '<div id="sy-campos">' +
+        '<div class="grupo">' +
+          '<label class="colunas" style="gap:var(--e-2);cursor:pointer">' +
+            '<input type="checkbox" id="sy-janela"' +
+            (e.janela_ativa ? ' checked' : '') + '>' +
+            '<span>Restringir a janela de consulta à SEFAZ</span></label>' +
+          '<p class="dica">Desligado, consulta 24h por dia respeitando o limite da SEFAZ.</p>' +
+        '</div>' +
+        '<div class="colunas" style="gap:var(--e-3)" id="sy-horas">' +
+          '<div class="grupo" style="flex:1"><label class="rotulo">Início</label>' +
+            '<input class="campo" type="time" id="sy-ini" value="' +
+              (e.janela_inicio || '22:00').slice(0,5) + '"></div>' +
+          '<div class="grupo" style="flex:1"><label class="rotulo">Fim</label>' +
+            '<input class="campo" type="time" id="sy-fim" value="' +
+              (e.janela_fim || '06:00').slice(0,5) + '"></div>' +
+        '</div>' +
+        '<div class="grupo" style="margin-top:var(--e-4)">' +
+          '<label class="colunas" style="gap:var(--e-2);cursor:pointer">' +
+            '<input type="checkbox" id="sy-ciencia"' +
+            (e.ciencia_auto ? ' checked' : '') + '>' +
+            '<span>Dar ciência da operação automaticamente</span></label>' +
+        '</div>' +
+        '<div class="aviso aviso-alerta on" style="margin-top:var(--e-2)">' +
+          'A ciência da operação é irreversível, inicia o prazo de 180 dias para a ' +
+          'manifestação definitiva e vale como reconhecimento da operação perante o ' +
+          'fisco. Cada ciência automática fica registrada na auditoria.</div>' +
+      '</div>',
+    acoes:[
+      {txt:'Cancelar', cls:'btn-2'},
+      {txt:'Salvar', cls:'btn-1', id:'sy-salvar', fn:async () => {
+        const b = $('#sy-salvar'); b.disabled = true; b.textContent = 'Salvando...';
+        try {
+          await api.put('/api/empresas/' + e.id + '/sincronizacao', {
+            herdar: $('#sy-herda').checked,
+            janela_ativa: $('#sy-janela').checked,
+            janela_inicio: $('#sy-ini').value,
+            janela_fim: $('#sy-fim').value,
+            ciencia_auto: $('#sy-ciencia').checked,
+          });
+          Modal.fecha('m-sync'); toast.ok('Configuração salva.'); await carregar();
+        } catch(err) {
+          const a = $('#sy-erro'); a.textContent = err.message; a.classList.add('on');
+        } finally { b.disabled = false; b.textContent = 'Salvar'; }
+      }},
+    ],
+  });
+  Modal.abre('m-sync');
+  const pinta = () => {
+    const h = $('#sy-herda').checked;
+    $('#sy-campos').style.opacity = h ? '.45' : '1';
+    $('#sy-campos').style.pointerEvents = h ? 'none' : 'auto';
+    $('#sy-horas').style.display = $('#sy-janela').checked ? 'flex' : 'none';
+  };
+  $('#sy-herda').onchange = pinta;
+  $('#sy-janela').onchange = pinta;
+  pinta();
+}
+
+function modalArquivar(e){
+  Modal.cria({
+    id:'m-arq', titulo:'Arquivar empresa',
+    corpo:
+      '<p style="margin:0 0 var(--e-4);line-height:1.65">' +
+        '<b>' + Fmt.escapa(e.razao_social) + '</b> sai da lista e para de sincronizar. ' +
+        'Nenhum documento, XML ou certificado é apagado — dá para restaurar depois.</p>' +
+      '<div class="grupo"><label class="rotulo" for="arq-motivo">Motivo (opcional)</label>' +
+        '<input class="campo" id="arq-motivo" placeholder="Encerrou contrato, baixa..."></div>',
+    acoes:[
+      {txt:'Cancelar', cls:'btn-2'},
+      {txt:'Arquivar', cls:'btn-perigo', fn:async () => {
+        try {
+          await api.post('/api/empresas/' + e.id + '/arquivar',
+            {motivo: $('#arq-motivo').value.trim() || null});
+          Modal.fecha('m-arq'); toast.ok('Empresa arquivada.'); await carregar();
+        } catch(err) { toast.erro(err.message); }
+      }},
+    ],
+  });
+  Modal.abre('m-arq');
+}
+
+async function restaurar(e){
+  try {
+    await api.post('/api/empresas/' + e.id + '/restaurar', {});
+    toast.ok('Empresa restaurada.'); await carregar();
+  } catch(err) { toast.erro(err.message); }
+}

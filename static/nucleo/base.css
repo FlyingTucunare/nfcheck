@@ -175,3 +175,24 @@ body.redim{cursor:col-resize;user-select:none}
 .t3{color:var(--txt-3);font-size:var(--t-sm)}
 .entra-lista>*{animation:sobeitem var(--mov-elastico) both}
 @keyframes sobeitem{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+/* ---------- menu suspenso ---------- */
+.menu-flut{position:absolute;z-index:100;min-width:225px;background:var(--sup-1);
+  border:1px solid var(--linha);border-radius:var(--r-lg);box-shadow:var(--sombra-alta);
+  padding:var(--e-1);animation:sobe var(--mov) both}
+.menu-flut button{display:flex;align-items:center;gap:var(--e-3);width:100%;
+  padding:9px var(--e-3);border:0;background:0;border-radius:var(--r-sm);
+  cursor:pointer;font-size:var(--t-md);color:var(--txt);text-align:left;
+  transition:background var(--mov-rapido)}
+.menu-flut button:hover{background:var(--sup-3)}
+.menu-flut button.perigo{color:var(--erro)}
+.menu-flut button.perigo:hover{background:var(--erro-fundo)}
+.menu-sep{height:1px;background:var(--linha);margin:var(--e-1) 0}
+
+
+/* ---------- acao em texto no rodape do card ---------- */
+.acao-txt{display:inline-flex;align-items:center;gap:5px;color:var(--acao);
+  font-weight:var(--p-forte);font-size:var(--t-sm);background:0;border:0;padding:0;
+  cursor:pointer;font-family:inherit;transition:color var(--mov-rapido)}
+.acao-txt:hover{color:var(--acao-hover)}
+.acao-txt svg{width:14px;height:14px}
