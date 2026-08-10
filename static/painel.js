@@ -38,10 +38,15 @@ function kpis() {
     {id:'sem',       n:sem,  r:'Sem certificado',      alerta:sem>0},
     {id:'sync',      n:par,  r:'Sem sincronizar 24h',  alerta:par>0},
   ];
-  $('#kpis').innerHTML = itens.map(k => `
-    <div class="kpi ${k.alerta?'alerta':''} ${filtro===k.id?'on':''}" data-f="${k.id??''}">
-      <div class="n">${k.n}</div><div class="r">${k.r}</div>
-    </div>`).join('');
+  $('#kpis').innerHTML = itens.map(k => {
+    const cls = ['kpi'];
+    if (k.alerta) cls.push('risco');
+    if (filtro === k.id) cls.push('on');
+    const f = k.id === null ? '' : k.id;
+    return '<div class="' + cls.join(' ') + '" data-f="' + f + '">' +
+           '<div class="n">' + k.n + '</div>' +
+           '<div class="r">' + k.r + '</div></div>';
+  }).join('');
   document.querySelectorAll('.kpi').forEach(el =>
     el.onclick = () => { const f = el.dataset.f || null;
       filtro = (filtro === f) ? null : f; render(); });
@@ -309,9 +314,9 @@ async function analisarCert() {
     $('#c-previa').style.display='block';
     if (d.aviso) { $('#c-aviso').textContent=d.aviso; $('#c-aviso').style.display='block'; }
     if (d.vencido) cErro('Certificado vencido. Envie um certificado válido.');
-    else $('#c-salvar').disabled=false;
+    else { $('#c-salvar').disabled=false; cErro(''); }
   } catch(e) { cErro(e.message); }
-  finally { b.disabled=false; b.textContent='Verificar certificado'; }
+  finally { b.disabled=false; b.textContent='Conferir senha'; }
 }
 
 async function salvarCert() {
@@ -328,6 +333,33 @@ async function salvarCert() {
   finally { b.disabled=false; b.textContent='Enviar certificado'; }
 }
 
+async function espiarCert() {
+  cErro(''); $('#c-previa').style.display='none'; $('#c-aviso').style.display='none';
+  $('#c-salvar').disabled=true;
+  const f = $('#c-arquivo').files[0];
+  if (!f) return;
+  const fd = new FormData();
+  fd.append('empresa_id', CERT_EMP.id); fd.append('arquivo', f);
+  try {
+    const d = await api('/api/certificados/espiar', {method:'POST', body:fd});
+    $('#c-previa-dl').innerHTML = [
+      ['Titular', d.titular_cn],
+      ['CNPJ', cnpjFmt(d.cnpj_titular)],
+      ['Emissor', d.emissor],
+      ['Válido de', dataFmt(d.valido_de)],
+      ['Válido até', dataFmt(d.valido_ate)],
+      ['Situação', d.vencido ? 'VENCIDO'
+        : d.dias_restantes < 30 ? `Vence em ${d.dias_restantes} dias`
+        : `Faltam ${d.dias_restantes} dias`],
+    ].filter(([,v])=>v).map(([k,v])=>`<dt>${k}</dt><dd>${v}</dd>`).join('');
+    $('#c-previa').style.display='block';
+    if (d.aviso) { $('#c-aviso').textContent=d.aviso; $('#c-aviso').style.display='block'; }
+    if (d.vencido) cErro('Certificado vencido. Envie um certificado válido.');
+    else $('#c-senha').focus();
+  } catch(e) { cErro(e.message); }
+}
+
+$('#c-arquivo').onchange = espiarCert;
 $('#c-analisar').onclick = analisarCert;
 $('#c-salvar').onclick = salvarCert;
 $('#c-fechar').onclick = $('#c-cancelar').onclick =

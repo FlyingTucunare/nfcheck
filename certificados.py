@@ -3,6 +3,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, Form
 from cryptography.hazmat.primitives.serialization import pkcs12
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes
 from db import q, FERNET, DIR_CERTS
 import auth
 
@@ -19,6 +21,53 @@ def _cnpj_do_cert(cert):
             break
     m = re.search(r"(\d{14})", cn or "")
     return (cn, m.group(1) if m else None)
+
+
+def _espia(conteudo):
+    """Le a parte publica do .pfx sem senha: o certificado do titular nao e cifrado.
+    Escolhe o cert cujo CN traz CNPJ e tem a validade mais recente (evita pegar a AC)."""
+    from cryptography.hazmat.primitives.serialization.pkcs12 import load_pkcs12
+    candidatos = []
+    try:
+        b = load_pkcs12(conteudo, None)
+        if b.cert and b.cert.certificate:
+            candidatos.append(b.cert.certificate)
+        for c in (b.additional_certs or []):
+            candidatos.append(c.certificate)
+    except Exception:
+        pass
+
+    if not candidatos:
+        import re as _re
+        blob = conteudo
+        for m in _re.finditer(b"\x30\x82", blob):
+            i = m.start()
+            if i + 4 > len(blob):
+                continue
+            tam = int.from_bytes(blob[i+2:i+4], "big") + 4
+            try:
+                candidatos.append(x509.load_der_x509_certificate(blob[i:i+tam]))
+            except Exception:
+                continue
+
+    melhor, melhor_cnpj = None, None
+    for c in candidatos:
+        cn, cnpj = _cnpj_do_cert(c)
+        if not cnpj:
+            continue
+        if melhor is None or c.not_valid_before_utc > melhor.not_valid_before_utc:
+            melhor, melhor_cnpj = c, cnpj
+    if melhor is None:
+        return None
+    cn, _ = _cnpj_do_cert(melhor)
+    emissor = ""
+    for a in melhor.issuer:
+        if a.oid.dotted_string == "2.5.4.3":
+            emissor = a.value
+            break
+    return {"titular_cn": cn, "cnpj_titular": melhor_cnpj, "emissor": emissor,
+            "valido_de": melhor.not_valid_before_utc,
+            "valido_ate": melhor.not_valid_after_utc}
 
 
 def _le_pfx(conteudo, senha):
@@ -50,6 +99,33 @@ def _confere_cnpj(cnpj_cert, cnpj_empresa):
         400,
         f"O certificado pertence ao CNPJ {cnpj_cert}, de outro grupo economico. "
         f"A empresa selecionada e {cnpj_empresa}.")
+
+
+@router.post("/espiar")
+async def espiar(empresa_id: int = Form(...), arquivo: UploadFile = File(...),
+                 u=Depends(auth.exige("cert_escrever"))):
+    """Mostra titular e validade sem exigir a senha."""
+    auth.exige_empresa(u, empresa_id)
+    conteudo = await arquivo.read()
+    if not conteudo or len(conteudo) > TAM_MAX:
+        raise HTTPException(400, "Arquivo invalido para um certificado A1.")
+
+    d = _espia(conteudo)
+    if not d:
+        raise HTTPException(400,
+            "Nao foi possivel identificar o titular. O arquivo parece nao ser "
+            "um certificado A1 da ICP-Brasil.")
+
+    emp = q("SELECT cnpj, razao_social FROM empresas WHERE id=%s", (empresa_id,), one=True)
+    aviso = _confere_cnpj(d["cnpj_titular"], emp["cnpj"])
+
+    agora = datetime.now(timezone.utc)
+    return {**d,
+            "valido_de": d["valido_de"].isoformat(),
+            "valido_ate": d["valido_ate"].isoformat(),
+            "vencido": d["valido_ate"] < agora,
+            "dias_restantes": (d["valido_ate"] - agora).days,
+            "aviso": aviso, "empresa": emp["razao_social"]}
 
 
 @router.post("/analisar")

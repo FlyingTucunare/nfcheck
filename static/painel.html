@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>NFCheck — Clientes</title>
 <link rel="icon" href="/static/logo.svg">
-<link rel="stylesheet" href="/static/base.css">
+<link rel="stylesheet" href="/static/base.css?v=20260810013414">
 <style>
   .topo{background:var(--tinta);padding:0 24px;height:58px;display:flex;
     align-items:center;justify-content:space-between}
@@ -25,7 +25,7 @@
   .kpi.on{border-color:var(--laranja);box-shadow:0 0 0 2px rgba(222,97,39,.14)}
   .kpi .n{font-size:28px;font-weight:600;letter-spacing:-.02em;line-height:1}
   .kpi .r{font-size:12px;color:var(--cinza);margin-top:6px;font-weight:600;letter-spacing:.02em}
-  .kpi.alerta .n{color:var(--brasa)}
+  .kpi.risco .n{color:var(--brasa)}
   .barra{display:flex;gap:10px;margin-bottom:14px;align-items:center}
   .barra .campo{max-width:340px}
   .cnt{margin-left:auto;font-size:12px;color:var(--cinza)}
@@ -170,15 +170,17 @@
       <div class="alerta alerta-erro" id="c-erro"></div>
       <p class="sub" id="c-empresa" style="margin:0 0 18px;color:var(--cinza);font-size:13px"></p>
 
-      <div style="margin-bottom:14px">
-        <label class="rotulo" for="c-arquivo">Arquivo .pfx ou .p12</label>
-        <input class="campo" type="file" id="c-arquivo" accept=".pfx,.p12">
-      </div>
-      <div style="margin-bottom:14px">
-        <label class="rotulo" for="c-senha">Senha do certificado</label>
-        <input class="campo" type="password" id="c-senha" autocomplete="off">
-      </div>
-      <button class="btn btn-neutro" id="c-analisar">Verificar certificado</button>
+      <form onsubmit="return false" autocomplete="off">
+        <div style="margin-bottom:14px">
+          <label class="rotulo" for="c-arquivo">Arquivo .pfx ou .p12</label>
+          <input class="campo" type="file" id="c-arquivo" accept=".pfx,.p12">
+        </div>
+        <div style="margin-bottom:14px">
+          <label class="rotulo" for="c-senha">Senha do certificado</label>
+          <input class="campo" type="password" id="c-senha" autocomplete="new-password">
+        </div>
+      </form>
+      <button class="btn btn-neutro" id="c-analisar">Conferir senha</button>
 
       <div class="previa" id="c-previa"><dl id="c-previa-dl"></dl></div>
       <div class="aviso" id="c-aviso"></div>
@@ -192,6 +194,6 @@
   </div>
 </div>
 
-<script src="/static/painel.js"></script>
+<script src="/static/painel.js?v=20260810013414"></script>
 </body>
 </html>
