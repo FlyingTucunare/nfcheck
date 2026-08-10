@@ -343,6 +343,79 @@ def excluir(empresa_id: int, confirmacao: str, request: Request,
     return {"ok": True}
 
 
+@router.get("/{empresa_id}/resumo")
+def resumo(empresa_id: int, u=Depends(auth.usuario_atual)):
+    """Tudo que a home da empresa precisa, numa chamada so."""
+    auth.exige_empresa(u, empresa_id)
+    e = q("""SELECT id,razao_social,nome_fantasia,cnpj,ie,im,municipio_nome,uf,
+                    logradouro,numero,complemento,bairro,cep,telefone1,email,
+                    regime_tributario,porte,situacao_cadastral,abertura,
+                    cnae_principal,cnae_principal_desc,natureza_juridica,
+                    capital_social,simples_optante,arquivada_em,observacoes
+             FROM empresas WHERE id=%s""", (empresa_id,), one=True)
+    if not e:
+        raise HTTPException(404, "Empresa nao encontrada")
+
+    mes = q("""SELECT COUNT(*) AS docs,
+                      COALESCE(SUM(valor),0) AS valor,
+                      COUNT(*) FILTER (WHERE manifestacao IS NULL AND NOT resumo)
+                        AS pendentes,
+                      COUNT(*) FILTER (WHERE resumo) AS resumos
+                 FROM documentos WHERE empresa_id=%s
+                  AND emissao >= date_trunc('month',
+                      NOW() AT TIME ZONE 'America/Sao_Paulo')""",
+            (empresa_id,), one=True)
+
+    total = q("SELECT COUNT(*) AS n FROM documentos WHERE empresa_id=%s",
+              (empresa_id,), one=True)
+
+    cert = q("""SELECT titular_cn,cnpj_titular,valido_ate,
+                       EXTRACT(DAY FROM valido_ate - NOW())::int AS dias
+                  FROM certificados WHERE empresa_id=%s AND ativo""",
+             (empresa_id,), one=True)
+
+    cursores = q("""SELECT origem,ultimo_nsu,ultima_sync,caught_up,pausado,
+                           pausado_motivo,ultimo_cstat
+                      FROM cursores_dfe WHERE empresa_id=%s ORDER BY origem""",
+                 (empresa_id,))
+
+    ultimos = q("""SELECT id,chave,tipo,emitente_nome,emitente_cnpj,numero,serie,
+                          emissao,valor,manifestacao,resumo,situacao
+                     FROM documentos WHERE empresa_id=%s
+                    ORDER BY emissao DESC NULLS LAST, id DESC LIMIT 10""",
+                (empresa_id,))
+
+    cfg = q("SELECT * FROM config_efetiva WHERE empresa_id=%s", (empresa_id,), one=True)
+    socios = q("""SELECT nome,qualificacao FROM empresa_socios
+                  WHERE empresa_id=%s ORDER BY nome""", (empresa_id,))
+
+    alertas = []
+    if e["arquivada_em"]:
+        alertas.append({"nivel":"aviso", "txt":"Esta empresa está arquivada e não sincroniza."})
+    if not cert:
+        alertas.append({"nivel":"aviso",
+                        "txt":"Sem certificado digital. A sincronização não roda sem ele."})
+    elif cert["dias"] is not None and cert["dias"] < 0:
+        alertas.append({"nivel":"erro", "txt":"O certificado digital está vencido."})
+    elif cert["dias"] is not None and cert["dias"] <= 30:
+        alertas.append({"nivel":"aviso",
+                        "txt":f"O certificado vence em {cert['dias']} dias."})
+    if e["situacao_cadastral"] and e["situacao_cadastral"] != "ATIVA":
+        alertas.append({"nivel":"erro",
+                        "txt":f"Situação cadastral na Receita: {e['situacao_cadastral']}."})
+    if mes["pendentes"]:
+        alertas.append({"nivel":"aviso",
+                        "txt":f"{mes['pendentes']} documento(s) aguardando manifestação."})
+    for c in cursores:
+        if c["pausado"]:
+            alertas.append({"nivel":"aviso",
+                            "txt":f"Sincronização pausada ({c['origem']}): {c['pausado_motivo']}"})
+
+    return {"empresa": e, "mes": mes, "total_docs": total["n"], "certificado": cert,
+            "cursores": cursores, "ultimos": ultimos, "config": cfg,
+            "socios": socios, "alertas": alertas}
+
+
 @router.get("/{empresa_id}")
 def detalhe(empresa_id: int, u=Depends(auth.usuario_atual)):
     auth.exige_empresa(u, empresa_id)
