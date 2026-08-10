@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NFCheck — Clientes</title>
+<link rel="icon" href="/static/logo.svg">
+<link rel="stylesheet" href="/static/base.css">
+<style>
+  .topo{background:var(--tinta);padding:0 24px;height:58px;display:flex;
+    align-items:center;justify-content:space-between}
+  .topo .dir{display:flex;align-items:center;gap:14px;color:#9DB4CC;font-size:13px}
+  .topo .sair{color:#9DB4CC;text-decoration:none;border:1px solid #1E3D5F;
+    padding:6px 12px;border-radius:8px}
+  .topo .sair:hover{border-color:var(--laranja);color:var(--ambar)}
+  .wrap{max-width:1400px;margin:0 auto;padding:28px 24px 60px}
+  .cab{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:22px}
+  .cab h1{font-size:24px;font-weight:600;letter-spacing:-.02em;margin:0}
+  .cab p{color:var(--cinza);font-size:13px;margin:4px 0 0}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px}
+  @media(max-width:900px){.kpis{grid-template-columns:repeat(2,1fr)}}
+  .kpi{background:#fff;border:1px solid var(--linha);border-radius:var(--r);
+    padding:16px 18px;cursor:pointer;transition:border-color .15s,box-shadow .15s}
+  .kpi:hover{border-color:var(--azul-med);box-shadow:var(--sombra)}
+  .kpi.on{border-color:var(--laranja);box-shadow:0 0 0 2px rgba(222,97,39,.14)}
+  .kpi .n{font-size:28px;font-weight:600;letter-spacing:-.02em;line-height:1}
+  .kpi .r{font-size:12px;color:var(--cinza);margin-top:6px;font-weight:600;letter-spacing:.02em}
+  .kpi.alerta .n{color:var(--brasa)}
+  .barra{display:flex;gap:10px;margin-bottom:14px;align-items:center}
+  .barra .campo{max-width:340px}
+  .cnt{margin-left:auto;font-size:12px;color:var(--cinza)}
+  .rolagem{overflow-x:auto;background:#fff;border:1px solid var(--linha);
+    border-radius:var(--r)}
+  table{border-collapse:collapse;table-layout:fixed}
+  .rolagem::-webkit-scrollbar{height:8px}
+  .rolagem::-webkit-scrollbar-thumb{background:var(--linha);border-radius:4px}
+  th{background:#EFEDE7;text-align:left;padding:11px 14px;font-size:11px;
+    font-weight:700;color:var(--cinza);letter-spacing:.06em;text-transform:uppercase;
+    cursor:pointer;user-select:none;white-space:nowrap;position:relative;
+    border-bottom:1px solid var(--linha);overflow:hidden;text-overflow:ellipsis}
+  th:hover{color:var(--tinta)}
+  th .seta{opacity:.35;margin-left:4px}
+  th.asc .seta,th.desc .seta{opacity:1;color:var(--laranja)}
+  th .puxador{position:absolute;top:0;right:0;width:8px;height:100%;
+    cursor:col-resize;user-select:none}
+  th .puxador::after{content:'';position:absolute;top:22%;right:3px;
+    width:1px;height:56%;background:var(--linha)}
+  th .puxador:hover::after,th .puxador.ativo::after{background:var(--laranja);width:2px}
+  td{padding:12px 14px;border-bottom:1px solid #EFEDE7;font-size:13.5px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  td .rz,td .sub{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  body.redim{cursor:col-resize;user-select:none}
+  tbody tr{cursor:pointer}
+  tbody tr:hover{background:#FAF8F3}
+  tbody tr:last-child td{border-bottom:0}
+  .rz{font-weight:600}
+  .sub{color:var(--cinza);font-size:11.5px;margin-top:2px}
+  .chip{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;
+    border-radius:99px;font-size:11px;font-weight:700;letter-spacing:.02em}
+  .c-ok{background:#E4F2EA;color:#1E7A4C}
+  .c-venc{background:#FCEFD9;color:#8A5A10}
+  .c-erro{background:#FBE6E4;color:var(--erro)}
+  .c-neutro{background:#EDEBE5;color:var(--cinza)}
+  .vazio{padding:56px;text-align:center;color:var(--cinza);background:#fff;
+    border:1px solid var(--linha);border-radius:var(--r)}
+  .modal{position:fixed;inset:0;background:rgba(6,30,56,.45);display:none;
+    align-items:center;justify-content:center;padding:24px;z-index:50}
+  .modal.on{display:flex}
+  .cx{background:#fff;border-radius:14px;width:100%;max-width:620px;
+    max-height:88vh;overflow:auto;box-shadow:0 20px 60px rgba(6,30,56,.3)}
+  .cx-cab{padding:20px 24px;border-bottom:1px solid var(--linha);
+    display:flex;justify-content:space-between;align-items:center}
+  .cx-cab h3{margin:0;font-size:17px;font-weight:600}
+  .cx-corpo{padding:24px}
+  .cx-pe{padding:16px 24px;border-top:1px solid var(--linha);
+    display:flex;gap:10px;justify-content:flex-end;background:#FAF8F3}
+  .x{background:0;border:0;cursor:pointer;color:var(--cinza);padding:4px}
+  .btn-neutro{background:#EDEBE5;color:var(--tinta)}
+  .btn-neutro:hover{background:#E2DFD7}
+  .previa{background:#FAF8F3;border:1px solid var(--linha);border-radius:var(--r);
+    padding:16px;margin-top:16px;display:none}
+  .previa dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13px}
+  .previa dt{color:var(--cinza);font-weight:600;font-size:11.5px;
+    text-transform:uppercase;letter-spacing:.04em;padding-top:1px}
+  .previa dd{margin:0}
+  .aviso{background:#FCEFD9;color:#8A5A10;padding:10px 13px;border-radius:8px;
+    font-size:12.5px;margin-top:12px;display:none}
+</style>
+</head>
+<body>
+
+<div class="topo">
+  <svg viewBox="0 0 300 76" width="150" height="38">
+    <rect x="2"  y="22" width="9" height="30" rx="4.5" fill="#7FB2E0"/>
+    <rect x="18" y="34" width="9" height="30" rx="4.5" fill="#7FB2E0"/>
+    <rect x="34" y="48" width="9" height="30" rx="4.5" fill="#B9D8F0"/>
+    <rect x="50" y="34" width="9" height="30" rx="4.5" fill="#EFA33A"/>
+    <rect x="66" y="16" width="9" height="30" rx="4.5" fill="#EFA33A"/>
+    <rect x="82" y="0"  width="9" height="30" rx="4.5" fill="#F6C77E"/>
+    <text x="108" y="52" font-family="Inter,Arial,sans-serif" font-size="38"
+          font-weight="700" fill="#fff" letter-spacing="-1">NF</text>
+    <text x="160" y="52" font-family="Inter,Arial,sans-serif" font-size="38"
+          font-weight="400" fill="#EFA33A" letter-spacing="-1">Check</text>
+  </svg>
+  <div class="dir">
+    <span id="quem"></span>
+    <a class="sair" href="#" id="sair">Sair</a>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="cab">
+    <div>
+      <h1>Clientes</h1>
+      <p>Selecione uma empresa para trabalhar nos módulos fiscais.</p>
+    </div>
+    <button class="btn btn-primario" id="btn-nova">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2.5" stroke-linecap="round" style="vertical-align:-2px;margin-right:6px">
+        <path d="M12 5v14M5 12h14"/></svg>Nova empresa
+    </button>
+  </div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="barra">
+    <input class="campo" id="busca" placeholder="Buscar por razão social, CNPJ ou município...">
+    <span class="cnt" id="cnt"></span>
+  </div>
+
+  <div id="area"></div>
+</div>
+
+<div class="modal" id="modal">
+  <div class="cx">
+    <div class="cx-cab">
+      <h3>Nova empresa</h3>
+      <button class="x" id="fechar">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="cx-corpo">
+      <div class="alerta alerta-erro" id="m-erro"></div>
+      <label class="rotulo" for="m-cnpj">CNPJ</label>
+      <div style="display:flex;gap:8px">
+        <input class="campo" id="m-cnpj" placeholder="00.000.000/0000-00" maxlength="18">
+        <button class="btn btn-neutro" id="m-buscar" style="white-space:nowrap">Consultar</button>
+      </div>
+      <div class="previa" id="previa"><dl id="previa-dl"></dl></div>
+      <div class="aviso" id="m-aviso"></div>
+    </div>
+    <div class="cx-pe">
+      <button class="btn btn-neutro" id="m-cancelar">Cancelar</button>
+      <button class="btn btn-primario" id="m-salvar" disabled>Cadastrar</button>
+    </div>
+  </div>
+</div>
+
+<script src="/static/painel.js"></script>
+</body>
+</html>

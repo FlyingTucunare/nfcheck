@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 76" width="300" height="76">
+  <rect x="2"  y="22" width="9" height="30" rx="4.5" fill="#061E38"/>
+  <rect x="18" y="34" width="9" height="30" rx="4.5" fill="#0B3A66"/>
+  <rect x="34" y="48" width="9" height="30" rx="4.5" fill="#1663A8"/>
+  <rect x="50" y="34" width="9" height="30" rx="4.5" fill="#B34718"/>
+  <rect x="66" y="16" width="9" height="30" rx="4.5" fill="#DE6127"/>
+  <rect x="82" y="0"  width="9" height="30" rx="4.5" fill="#EFA33A"/>
+  <text x="108" y="52" font-family="Inter,Helvetica,Arial,sans-serif" font-size="38"
+        font-weight="700" fill="#061E38" letter-spacing="-1">NF</text>
+  <text x="160" y="52" font-family="Inter,Helvetica,Arial,sans-serif" font-size="38"
+        font-weight="400" fill="#DE6127" letter-spacing="-1">Check</text>
+</svg>

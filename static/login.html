@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NFCheck — Entrar</title>
+<link rel="icon" href="/static/logo.svg">
+<link rel="stylesheet" href="/static/base.css">
+<style>
+  body{display:flex;min-height:100vh}
+  .painel{flex:1;background:var(--tinta);display:flex;flex-direction:column;
+    justify-content:center;padding:64px;color:#fff}
+  .painel h1{font-size:32px;font-weight:600;letter-spacing:-.02em;margin:32px 0 12px;max-width:15ch}
+  .painel p{color:#9DB4CC;font-size:15px;line-height:1.65;max-width:38ch;margin:0}
+  .painel .marca svg text:first-of-type{fill:#fff}
+  .lado{width:480px;display:flex;align-items:center;justify-content:center;padding:40px}
+  .caixa{width:100%;max-width:340px}
+  .caixa h2{font-size:22px;font-weight:600;margin:0 0 6px}
+  .caixa .sub{color:var(--cinza);font-size:14px;margin:0 0 28px}
+  .grupo{margin-bottom:16px}
+  .btn-primario{width:100%;margin-top:8px}
+  .rodape{margin-top:28px;font-size:12px;color:var(--cinza);text-align:center}
+  @media(max-width:900px){.painel{display:none}.lado{width:100%}}
+</style>
+</head>
+<body>
+  <div class="painel">
+    <div class="marca">
+      <svg viewBox="0 0 300 76" width="230" height="58">
+        <rect x="2"  y="22" width="9" height="30" rx="4.5" fill="#7FB2E0"/>
+        <rect x="18" y="34" width="9" height="30" rx="4.5" fill="#7FB2E0"/>
+        <rect x="34" y="48" width="9" height="30" rx="4.5" fill="#B9D8F0"/>
+        <rect x="50" y="34" width="9" height="30" rx="4.5" fill="#EFA33A"/>
+        <rect x="66" y="16" width="9" height="30" rx="4.5" fill="#EFA33A"/>
+        <rect x="82" y="0"  width="9" height="30" rx="4.5" fill="#F6C77E"/>
+        <text x="108" y="52" font-family="Inter,Arial,sans-serif" font-size="38"
+              font-weight="700" fill="#FFFFFF" letter-spacing="-1">NF</text>
+        <text x="160" y="52" font-family="Inter,Arial,sans-serif" font-size="38"
+              font-weight="400" fill="#EFA33A" letter-spacing="-1">Check</text>
+      </svg>
+    </div>
+    <h1>Documento fiscal sob controle.</h1>
+    <p>Todas as empresas da sua contabilidade em um lugar só. Notas recebidas,
+       certificados, relatórios e emissão de NFS-e.</p>
+  </div>
+
+  <div class="lado">
+    <div class="caixa">
+      <h2>Entrar</h2>
+      <p class="sub">Acesse com seu e-mail e senha.</p>
+
+      <div class="alerta alerta-erro" id="erro"></div>
+
+      <div class="grupo">
+        <label class="rotulo" for="email">E-mail</label>
+        <input class="campo" type="email" id="email" autocomplete="username" autofocus>
+      </div>
+      <div class="grupo">
+        <label class="rotulo" for="senha">Senha</label>
+        <input class="campo" type="password" id="senha" autocomplete="current-password">
+      </div>
+
+      <button class="btn btn-primario" id="btn">Entrar</button>
+      <p class="rodape">NFCheck · Órbita Softwares e Integrações</p>
+    </div>
+  </div>
+
+<script>
+const $ = s => document.querySelector(s);
+const erro = m => { const e=$('#erro'); e.textContent=m; e.style.display=m?'block':'none'; };
+
+async function entrar(){
+  erro('');
+  const email=$('#email').value.trim(), senha=$('#senha').value;
+  if(!email||!senha){ erro('Preencha e-mail e senha.'); return; }
+  const b=$('#btn'); b.disabled=true; b.textContent='Entrando...';
+  try{
+    const r=await fetch('/api/login',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({email,senha})});
+    const d=await r.json();
+    if(!r.ok){ erro(d.detail||'Nao foi possivel entrar.'); return; }
+    sessionStorage.setItem('nfc_token',d.token);
+    sessionStorage.setItem('nfc_usuario',JSON.stringify(d.usuario));
+    location.href='/painel';
+  }catch(e){ erro('Falha de conexao. Tente novamente.'); }
+  finally{ b.disabled=false; b.textContent='Entrar'; }
+}
+$('#btn').addEventListener('click',entrar);
+['email','senha'].forEach(id=>$('#'+id)
+  .addEventListener('keydown',e=>{ if(e.key==='Enter') entrar(); }));
+</script>
+</body>
+</html>
