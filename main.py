@@ -7,11 +7,13 @@ from pydantic import BaseModel
 from db import q
 import auth
 import empresas
+import certificados
 
 app = FastAPI(title="NFCheck", docs_url=None, redoc_url=None)
 BASE = Path(__file__).parent
 app.mount("/static", StaticFiles(directory=BASE / "static"), name="static")
 app.include_router(empresas.router)
+app.include_router(certificados.router)
 
 class Login(BaseModel):
     email: str

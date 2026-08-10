@@ -157,6 +157,41 @@
   </div>
 </div>
 
+<div class="modal" id="modal-cert">
+  <div class="cx">
+    <div class="cx-cab">
+      <h3>Certificado digital</h3>
+      <button class="x" id="c-fechar">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="cx-corpo">
+      <div class="alerta alerta-erro" id="c-erro"></div>
+      <p class="sub" id="c-empresa" style="margin:0 0 18px;color:var(--cinza);font-size:13px"></p>
+
+      <div style="margin-bottom:14px">
+        <label class="rotulo" for="c-arquivo">Arquivo .pfx ou .p12</label>
+        <input class="campo" type="file" id="c-arquivo" accept=".pfx,.p12">
+      </div>
+      <div style="margin-bottom:14px">
+        <label class="rotulo" for="c-senha">Senha do certificado</label>
+        <input class="campo" type="password" id="c-senha" autocomplete="off">
+      </div>
+      <button class="btn btn-neutro" id="c-analisar">Verificar certificado</button>
+
+      <div class="previa" id="c-previa"><dl id="c-previa-dl"></dl></div>
+      <div class="aviso" id="c-aviso"></div>
+
+      <div id="c-hist" style="margin-top:22px"></div>
+    </div>
+    <div class="cx-pe">
+      <button class="btn btn-neutro" id="c-cancelar">Fechar</button>
+      <button class="btn btn-primario" id="c-salvar" disabled>Enviar certificado</button>
+    </div>
+  </div>
+</div>
+
 <script src="/static/painel.js"></script>
 </body>
 </html>

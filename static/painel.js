@@ -159,7 +159,8 @@ function render() {
       <td>${e.municipio_nome||'—'}${e.uf?'/'+e.uf:''}</td>
       <td>${e.regime_tributario||'—'}</td>
       <td>${e.porte||'—'}</td>
-      <td><span class="chip ${cs.cls}">${cs.txt}</span></td>
+      <td><span class="chip ${cs.cls} chip-cert" data-cert="${e.id}"
+            style="cursor:pointer" title="Gerenciar certificado">${cs.txt}</span></td>
       <td>${dataFmt(e.cert_ate)}</td>
       <td>${e.ultima_sync ? dataFmt(e.ultima_sync) : '—'}</td>
     </tr>`;
@@ -172,6 +173,10 @@ function render() {
     const c = el.dataset.c;
     ordem = {col:c, dir: ordem.col===c ? -ordem.dir : 1};
     render();
+  });
+  document.querySelectorAll('.chip-cert').forEach(el => el.onclick = ev => {
+    ev.stopPropagation();
+    abrirCert(DADOS.find(x => x.id == el.dataset.cert));
   });
   document.querySelectorAll('tbody tr').forEach(el => el.onclick = () => {
     sessionStorage.setItem('nfc_empresa', el.dataset.id);
@@ -259,3 +264,71 @@ $('#m-cnpj').addEventListener('input', e => {
 document.addEventListener('keydown', e => { if (e.key==='Escape') fecharModal(); });
 
 carregar();
+
+/* ---------- certificados ---------- */
+let CERT_EMP = null;
+const cErro = m => { const e=$('#c-erro'); e.textContent=m; e.style.display=m?'block':'none'; };
+
+async function abrirCert(empresa) {
+  CERT_EMP = empresa;
+  $('#c-empresa').textContent = empresa.razao_social + ' · ' + cnpjFmt(empresa.cnpj);
+  $('#c-arquivo').value=''; $('#c-senha').value='';
+  $('#c-previa').style.display='none'; $('#c-aviso').style.display='none';
+  cErro(''); $('#c-salvar').disabled=true;
+  $('#modal-cert').classList.add('on');
+  try {
+    const h = await api('/api/certificados/empresa/' + empresa.id);
+    $('#c-hist').innerHTML = h.length ? `
+      <div class="rotulo">Histórico</div>
+      <table style="font-size:12.5px"><tbody>${h.map(c=>`
+        <tr><td>${c.titular_cn||'—'}</td>
+            <td>${dataFmt(c.valido_ate)}</td>
+            <td><span class="chip ${c.ativo?'c-ok':'c-neutro'}">${c.ativo?'Ativo':'Substituído'}</span></td>
+        </tr>`).join('')}</tbody></table>` : '';
+  } catch(e) { $('#c-hist').innerHTML=''; }
+}
+
+async function analisarCert() {
+  cErro(''); $('#c-previa').style.display='none'; $('#c-aviso').style.display='none';
+  $('#c-salvar').disabled=true;
+  const f = $('#c-arquivo').files[0], s = $('#c-senha').value;
+  if (!f) { cErro('Selecione o arquivo do certificado.'); return; }
+  if (!s) { cErro('Informe a senha do certificado.'); return; }
+  const b = $('#c-analisar'); b.disabled=true; b.textContent='Verificando...';
+  const fd = new FormData();
+  fd.append('empresa_id', CERT_EMP.id); fd.append('senha', s); fd.append('arquivo', f);
+  try {
+    const d = await api('/api/certificados/analisar', {method:'POST', body:fd});
+    $('#c-previa-dl').innerHTML = [
+      ['Titular', d.titular_cn],
+      ['CNPJ', cnpjFmt(d.cnpj_titular)],
+      ['Válido de', dataFmt(d.valido_de)],
+      ['Válido até', dataFmt(d.valido_ate)],
+      ['Situação', d.vencido ? 'VENCIDO' : `Faltam ${d.dias_restantes} dias`],
+    ].filter(([,v])=>v).map(([k,v])=>`<dt>${k}</dt><dd>${v}</dd>`).join('');
+    $('#c-previa').style.display='block';
+    if (d.aviso) { $('#c-aviso').textContent=d.aviso; $('#c-aviso').style.display='block'; }
+    if (d.vencido) cErro('Certificado vencido. Envie um certificado válido.');
+    else $('#c-salvar').disabled=false;
+  } catch(e) { cErro(e.message); }
+  finally { b.disabled=false; b.textContent='Verificar certificado'; }
+}
+
+async function salvarCert() {
+  const b = $('#c-salvar'); b.disabled=true; b.textContent='Enviando...';
+  const fd = new FormData();
+  fd.append('empresa_id', CERT_EMP.id);
+  fd.append('senha', $('#c-senha').value);
+  fd.append('arquivo', $('#c-arquivo').files[0]);
+  try {
+    await api('/api/certificados', {method:'POST', body:fd});
+    $('#modal-cert').classList.remove('on');
+    await carregar();
+  } catch(e) { cErro(e.message); }
+  finally { b.disabled=false; b.textContent='Enviar certificado'; }
+}
+
+$('#c-analisar').onclick = analisarCert;
+$('#c-salvar').onclick = salvarCert;
+$('#c-fechar').onclick = $('#c-cancelar').onclick =
+  () => $('#modal-cert').classList.remove('on');
