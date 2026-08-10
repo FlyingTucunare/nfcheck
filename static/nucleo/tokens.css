@@ -1,0 +1,100 @@
+/* NFCheck — fonte unica de verdade do visual.
+   Trocar cor, espacamento ou tipografia aqui muda o sistema inteiro. */
+
+:root{
+  /* marca */
+  --marca-tinta:#061E38;
+  --marca-azul:#0B3A66;
+  --marca-azul-med:#1663A8;
+  --marca-brasa:#B34718;
+  --marca-laranja:#DE6127;
+  --marca-ambar:#EFA33A;
+
+  /* tipografia */
+  --fonte:'Inter',-apple-system,'Segoe UI',Roboto,Arial,sans-serif;
+  --fonte-num:'JetBrains Mono','SF Mono',Menlo,monospace;
+  --t-xs:11px; --t-sm:12px; --t-md:13px; --t-base:13.5px;
+  --t-lg:15px; --t-xl:18px; --t-2xl:22px; --t-3xl:26px;
+  --p-normal:400; --p-medio:500; --p-forte:600; --p-max:700;
+
+  /* espacamento e forma */
+  --e-1:4px; --e-2:8px; --e-3:12px; --e-4:16px; --e-5:22px; --e-6:30px; --e-7:44px;
+  --r-sm:6px; --r:9px; --r-lg:13px; --r-xl:16px; --r-pill:99px;
+
+  /* movimento */
+  --mov-rapido:120ms cubic-bezier(.4,0,.2,1);
+  --mov:180ms cubic-bezier(.4,0,.2,1);
+  --mov-elastico:260ms cubic-bezier(.34,1.32,.5,1);
+
+  /* densidade */
+  --alt-linha:38px;
+  --alt-controle:36px;
+}
+
+/* ---------- tema claro (padrao) ---------- */
+:root, [data-tema="claro"]{
+  --fundo:#F5F3EE;
+  --fundo-topo:linear-gradient(168deg,#061E38 0%,#0A2A4D 100%);
+  --sup-1:#FFFFFF;
+  --sup-2:#FAF8F3;
+  --sup-3:#EFEDE7;
+  --sup-hover:#F5F3EE;
+
+  --txt:#061E38;
+  --txt-2:#6F6C66;
+  --txt-3:#9C9992;
+  --txt-inv:#FFFFFF;
+
+  --linha:#DCD8CF;
+  --linha-forte:#C4BFB4;
+
+  --acao:#DE6127;
+  --acao-hover:#B34718;
+  --acao-txt:#FFFFFF;
+  --acao-fraco:#FBEDE6;
+
+  --ok:#1E7A4C;      --ok-fundo:#E4F2EA;   --ok-borda:#B4DCC6;
+  --aviso:#8A5A10;   --aviso-fundo:#FCEFD9;--aviso-borda:#EFD5A3;
+  --erro:#B3261E;    --erro-fundo:#FBE6E4; --erro-borda:#F0C3BF;
+  --neutro:#6F6C66;  --neutro-fundo:#EDEBE5;--neutro-borda:#DCD8CF;
+
+  --sombra:0 1px 2px rgba(6,30,56,.06), 0 4px 14px rgba(6,30,56,.05);
+  --sombra-alta:0 4px 10px rgba(6,30,56,.09), 0 16px 40px rgba(6,30,56,.10);
+  --halo:radial-gradient(circle at 88% -30%, rgba(222,97,39,.16), transparent 60%);
+}
+
+/* ---------- tema escuro ---------- */
+[data-tema="escuro"]{
+  --fundo:#0F1216;
+  --fundo-topo:linear-gradient(168deg,#0A1420 0%,#122436 100%);
+  --sup-1:#151A21;
+  --sup-2:#131820;
+  --sup-3:#1C222B;
+  --sup-hover:#1A212B;
+
+  --txt:#E8E6E1;
+  --txt-2:#9195A0;
+  --txt-3:#6A6E78;
+  --txt-inv:#0F1216;
+
+  --linha:#232830;
+  --linha-forte:#333A45;
+
+  --acao:#E5723C;
+  --acao-hover:#F08A57;
+  --acao-txt:#0F1216;
+  --acao-fraco:rgba(229,114,60,.14);
+
+  --ok:#6DC49A;      --ok-fundo:rgba(30,122,76,.18);  --ok-borda:rgba(30,122,76,.4);
+  --aviso:#EFA33A;   --aviso-fundo:rgba(239,163,58,.14);--aviso-borda:rgba(239,163,58,.34);
+  --erro:#F08B84;    --erro-fundo:rgba(179,38,30,.18); --erro-borda:rgba(179,38,30,.4);
+  --neutro:#9195A0;  --neutro-fundo:rgba(255,255,255,.06);--neutro-borda:#2A313B;
+
+  --sombra:0 1px 2px rgba(0,0,0,.4), 0 4px 14px rgba(0,0,0,.3);
+  --sombra-alta:0 4px 10px rgba(0,0,0,.5), 0 16px 40px rgba(0,0,0,.4);
+  --halo:radial-gradient(circle at 88% -30%, rgba(229,114,60,.13), transparent 60%);
+}
+
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.01ms !important;transition-duration:.01ms !important}
+}

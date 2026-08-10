@@ -18,6 +18,45 @@ const moedaFmt = v => v == null ? '—' :
   Number(v).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
 
 let DADOS = [], filtro = null, ordem = {col:'razao_social', dir:1};
+let VISAO = localStorage.getItem('nfc_visao') || 'cards';
+
+const sigla = nome => (nome||'').split(/\s+/)
+  .filter(p => p.length > 2 && !['DE','DA','DO','DOS','DAS','E','LTDA','ME','EPP','SA'].includes(p))
+  .slice(0,2).map(p => p[0]).join('') || '??';
+
+function renderCards(l) {
+  $('#area').innerHTML = '<div class="cards">' + l.map(e => {
+    const cs = CERT[e.cert_status] || CERT.sem;
+    const chips = ['<span class="chip ' + cs.cls + '">' + cs.txt + '</span>'];
+    if (e.regime_tributario)
+      chips.push('<span class="chip c-neutro">' + e.regime_tributario + '</span>');
+    if (e.situacao_cadastral && e.situacao_cadastral !== 'ATIVA')
+      chips.push('<span class="chip c-erro">' + e.situacao_cadastral + '</span>');
+    return '<div class="card" data-id="' + e.id + '">' +
+      '<div class="card-topo">' +
+        '<div style="min-width:0">' +
+          '<div class="card-nome" title="' + e.razao_social + '">' +
+            (e.nome_fantasia || e.razao_social) + '</div>' +
+          '<div class="card-cnpj">' + cnpjFmt(e.cnpj) + '</div>' +
+        '</div>' +
+        '<div class="card-sigla">' + sigla(e.razao_social) + '</div>' +
+      '</div>' +
+      '<div class="card-meta">' + chips.join('') + '</div>' +
+      '<div class="card-rodape">' +
+        '<span>' + (e.municipio_nome || '—') + (e.uf ? '/' + e.uf : '') +
+          (e.cert_ate ? ' · vence <b>' + dataFmt(e.cert_ate) + '</b>' : '') + '</span>' +
+        '<span class="card-acao">Abrir' +
+          '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+          'stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">' +
+          '<path d="M9 18l6-6-6-6"/></svg></span>' +
+      '</div></div>';
+  }).join('') + '</div>';
+
+  document.querySelectorAll('.card').forEach(el => el.onclick = () => {
+    sessionStorage.setItem('nfc_empresa', el.dataset.id);
+    location.href = '/empresa';
+  });
+}
 
 const CERT = {
   ok:      {cls:'c-ok',     txt:'Válido'},
@@ -139,6 +178,8 @@ function visiveis() {
 
 function render() {
   kpis();
+  $('#v-cards').classList.toggle('on', VISAO === 'cards');
+  $('#v-grid').classList.toggle('on', VISAO === 'grid');
   const l = visiveis();
   $('#cnt').textContent = `${l.length} de ${DADOS.length}`;
   if (!l.length) {
@@ -147,6 +188,7 @@ function render() {
       : 'Nenhuma empresa cadastrada ainda. Comece cadastrando a primeira.'}</div>`;
     return;
   }
+  if (VISAO === 'cards') { renderCards(l); return; }
   const cg = COLS.map(c =>
     `<col data-c="${c.k}" style="width:${larg(c)}px">`).join('');
   const th = COLS.map(c => {
@@ -257,6 +299,8 @@ $('#m-cancelar').onclick = fecharModal;
 $('#m-buscar').onclick = consultar;
 $('#m-salvar').onclick = salvar;
 $('#busca').oninput = render;
+$('#v-cards').onclick = () => { VISAO='cards'; localStorage.setItem('nfc_visao','cards'); render(); };
+$('#v-grid').onclick  = () => { VISAO='grid';  localStorage.setItem('nfc_visao','grid');  render(); };
 ligaPuxadores();
 window.addEventListener('resize', ajustaLargura);
 $('#m-cnpj').addEventListener('keydown', e => { if (e.key==='Enter') consultar(); });

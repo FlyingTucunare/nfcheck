@@ -45,6 +45,25 @@ def saude():
 def painel():
     return FileResponse(BASE / "static" / "painel.html")
 
+def _pagina(nome: str, escopo: str):
+    """Serve static/paginas/<escopo>/<nome>.html, com fallback para a casca generica."""
+    alvo = BASE / "static" / "paginas" / escopo / f"{nome}.html"
+    if alvo.exists():
+        return FileResponse(alvo)
+    return FileResponse(BASE / "static" / "paginas" / "emconstrucao.html")
+
+@app.get("/escritorio/{modulo}")
+def pagina_escritorio(modulo: str):
+    return _pagina(modulo, "escritorio")
+
+@app.get("/e/{modulo}")
+def pagina_empresa(modulo: str):
+    return _pagina(modulo, "empresa")
+
+@app.get("/empresa")
+def empresa_home():
+    return FileResponse(BASE / "static" / "paginas" / "empresa" / "home.html")
+
 @app.get("/")
 def raiz():
     idx = BASE / "static" / "login.html"
