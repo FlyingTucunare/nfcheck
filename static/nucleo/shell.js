@@ -102,12 +102,21 @@ const Shell = {
 
   async contexto(empresaId){
     const e = await api.get('/api/empresas/' + empresaId);
+    const naHome = location.pathname === '/empresa';
+    const modulo = MODULOS.find(m => m.rota === location.pathname);
     $('#shell-contexto').innerHTML =
-      '<a href="/painel" class="shell-volta" title="Voltar aos clientes">' +
-        Icone.volta + '</a>' +
-      '<div class="shell-sigla">' + Fmt.sigla(e.razao_social) + '</div>' +
+      '<a href="' + (naHome ? '/painel' : '/empresa') + '" class="shell-volta" ' +
+        'title="' + (naHome ? 'Voltar aos clientes' : 'Voltar à empresa') + '">' +
+        Icone.volta + '<span class="so-largo">' +
+        (naHome ? 'Clientes' : 'Empresa') + '</span></a>' +
+      '<a href="/empresa" class="shell-sigla" style="text-decoration:none" ' +
+        'title="Ir para a empresa">' + Fmt.sigla(e.razao_social) + '</a>' +
       '<div style="min-width:0">' +
-        '<div class="shell-emp">' + Fmt.escapa(e.nome_fantasia || e.razao_social) + '</div>' +
+        '<div class="shell-emp">' +
+          '<a href="/empresa" style="color:inherit">' +
+            Fmt.escapa(e.nome_fantasia || e.razao_social) + '</a>' +
+          (modulo ? '<span class="shell-mod">' + Icone.seta +
+            Fmt.escapa(modulo.nome) + '</span>' : '') + '</div>' +
         '<div class="shell-cnpj num">' + Fmt.cnpj(e.cnpj) + '</div>' +
       '</div>';
     return e;

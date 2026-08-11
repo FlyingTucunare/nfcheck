@@ -30,13 +30,32 @@ class Grid {
       ? (localStorage.getItem('nfc_visao_' + this.chave) || 'cartoes')
       : 'tabela';
     this.larguras = this._leLarguras();
+    this.selecao = new Set();
+    this.selecionavel = !!cfg.selecionavel;
+    this.auto = cfg.porPagina === 'auto';
+    this.porPagina = this.auto ? 20 : (cfg.porPagina || 0);
+    this.pagina = 1;
+    if (this.auto) {
+      let t;
+      window.addEventListener('resize', () => {
+        clearTimeout(t);
+        t = setTimeout(() => { if (this._calculaCabem()) this.render(); }, 200);
+      });
+    }
     this._ligaEventos();
   }
 
   /* ---------- dados ---------- */
-  dados(l){ this.lista = l || []; this.render(); return this; }
-  busca(t){ this.termo = (t || '').toLowerCase().trim(); this.render(); }
-  filtra(f){ this.filtro = f; this.render(); }
+  dados(l){ this.lista = l || []; this.pagina = 1; this.render(); return this; }
+  busca(t){ this.termo = (t || '').toLowerCase().trim();
+    this.pagina = 1; this.render(); }
+  filtra(f){ this.filtro = f; this.pagina = 1; this.render(); }
+  vaiPara(p){
+    const max = Math.max(1, Math.ceil(this.visiveis().length / this.porPagina));
+    this.pagina = Math.max(1, Math.min(p, max));
+    this.render();
+    this.el.scrollIntoView({behavior:'smooth', block:'start'});
+  }
   trocaVisao(v){
     this.visao = v;
     localStorage.setItem('nfc_visao_' + this.chave, v);
@@ -77,10 +96,54 @@ class Grid {
       {detail:{grid:this, total:this.lista.length, exibidos:l.length}}));
 
     if (!l.length) { this.el.innerHTML = this._vazio(); return; }
-    this.el.innerHTML = this.visao === 'cartoes' && this.cfg.cartao
-      ? this._cartoes(l) : this._tabela(l);
+    if (this.auto && !this._calculado) {
+      this._calculado = true;
+      this._calculaCabem();
+    }
+    const pag = this.porPagina
+      ? l.slice((this.pagina - 1) * this.porPagina, this.pagina * this.porPagina)
+      : l;
+    this.el.innerHTML = (this.visao === 'cartoes' && this.cfg.cartao
+      ? this._cartoes(pag) : this._tabela(pag)) + this._paginacao(l.length);
     this._ligaLinhas();
+    this._ligaPaginacao();
     if (this.visao === 'tabela') this._ajusta();
+  }
+
+  _paginacao(total){
+    if (!this.porPagina || total <= this.porPagina) return '';
+    const paginas = Math.ceil(total / this.porPagina);
+    const p = this.pagina;
+    const nums = [];
+    const add = n => { if (!nums.includes(n) && n >= 1 && n <= paginas) nums.push(n); };
+    add(1); add(2);
+    for (let i = p - 1; i <= p + 1; i++) add(i);
+    add(paginas - 1); add(paginas);
+    nums.sort((a, b) => a - b);
+
+    let botoes = '', ant = 0;
+    nums.forEach(n => {
+      if (n - ant > 1) botoes += '<span class="t3">…</span>';
+      botoes += '<button class="pag-btn' + (n === p ? ' on' : '') +
+        '" data-p="' + n + '">' + n + '</button>';
+      ant = n;
+    });
+    const ini = (p - 1) * this.porPagina + 1;
+    const fim = Math.min(p * this.porPagina, total);
+    return '<div class="paginacao">' +
+      '<span class="t3">' + ini + '–' + fim + ' de ' + Fmt.numero(total) + '</span>' +
+      '<button class="pag-btn" data-p="' + (p - 1) + '"' +
+        (p === 1 ? ' disabled' : '') + '>‹</button>' + botoes +
+      '<button class="pag-btn" data-p="' + (p + 1) + '"' +
+        (p === paginas ? ' disabled' : '') + '>›</button>' +
+    '</div>';
+  }
+
+  _ligaPaginacao(){
+    $$('.pag-btn[data-p]', this.el).forEach(b => b.onclick = ev => {
+      ev.stopPropagation();
+      this.vaiPara(Number(b.dataset.p));
+    });
   }
 
   _vazio(){
@@ -105,17 +168,32 @@ class Grid {
       }).join('') + '</div>';
   }
 
+  limpaSelecao(){ this.selecao.clear(); this.render(); this._avisaSelecao(); }
+  _avisaSelecao(){
+    document.dispatchEvent(new CustomEvent('grid-selecao',
+      {detail:{grid:this, ids:[...this.selecao]}}));
+  }
+
   _tabela(l){
-    const cols = this.colunas.map(c =>
+    const sel = this.selecionavel;
+    const cols = (sel ? '<col style="width:40px">' : '') + this.colunas.map(c =>
       '<col data-c="' + c.k + '" style="width:' + this._larg(c) + 'px">').join('');
-    const th = this.colunas.map(c => {
+    const marcados = l.length && l.every(x => this.selecao.has(x.id));
+    const th = (sel ? '<th style="width:40px;cursor:default">' +
+        '<input type="checkbox" data-todos' + (marcados ? ' checked' : '') +
+        ' title="Selecionar os desta pagina"></th>' : '') +
+      this.colunas.map(c => {
       const on = this.ordem.col === c.k ? (this.ordem.dir === 1 ? 'asc' : 'desc') : '';
       const s  = this.ordem.col === c.k ? (this.ordem.dir === 1 ? '▲' : '▼') : '▲';
       return '<th class="' + on + '" data-c="' + c.k + '" title="' + Fmt.escapa(c.t) + '" ' +
              'style="width:' + this._larg(c) + 'px">' + Fmt.escapa(c.t) +
              '<span class="seta">' + s + '</span><span class="puxador"></span></th>';
     }).join('');
-    const tr = l.map(e => '<tr data-id="' + e.id + '">' + this.colunas.map(c => {
+    const tr = l.map(e => '<tr data-id="' + e.id + '"' +
+      (this.selecao.has(e.id) ? ' class="sel"' : '') + '>' +
+      (sel ? '<td data-parar><input type="checkbox" data-sel="' + e.id + '"' +
+        (this.selecao.has(e.id) ? ' checked' : '') + '></td>' : '') +
+      this.colunas.map(c => {
       const v = c.cel ? c.cel(e) : (c.fmt ? c.fmt(e[c.k]) : Fmt.escapa(e[c.k] ?? '—'));
       const cls = c.num ? ' class="num"' : '';
       return '<td' + cls + ' title="' + Fmt.escapa(c.cel ? '' : (e[c.k] ?? '')) + '">' +
@@ -127,12 +205,38 @@ class Grid {
       '<tbody>' + tr + '</tbody></table></div></div>';
   }
 
+  _calculaCabem(){
+    /* quantas linhas cabem sem rolagem: sobra da viewport dividida pela altura */
+    const topo = this.el.getBoundingClientRect().top;
+    const reservado = 42 + 56 + 24;   // cabecalho da tabela + paginacao + folga
+    const linha = parseInt(getComputedStyle(document.body)
+      .getPropertyValue('--alt-linha')) || 38;
+    const cabem = Math.max(8, Math.floor((window.innerHeight - topo - reservado) / linha));
+    if (cabem === this.porPagina) return false;
+    this.porPagina = cabem;
+    return true;
+  }
+
   _ajusta(){
     const t = $('table.dados', this.el);
     if (!t) return;
-    const soma = this.colunas.reduce((s, c) => s + this._larg(c), 0);
+    const extra = this.selecionavel ? 40 : 0;
+    const soma = this.colunas.reduce((s, c) => s + this._larg(c), 0) + extra;
     const disp = t.parentElement.clientWidth;
     t.style.width = (soma < disp ? disp : soma) + 'px';
+
+    // sobra de espaco vai para a coluna flexivel, nao distribuida em todas
+    const flex = this.cfg.colunaFlexivel;
+    if (flex && soma < disp && !this.larguras[flex]) {
+      const c = this.colunas.find(x => x.k === flex);
+      if (c) {
+        const nova = (c.w || 140) + (disp - soma);
+        const cg = $('col[data-c="' + flex + '"]', this.el);
+        const th = $('th[data-c="' + flex + '"]', this.el);
+        if (cg) cg.style.width = nova + 'px';
+        if (th) th.style.width = nova + 'px';
+      }
+    }
   }
 
   _ligaLinhas(){
@@ -191,6 +295,27 @@ class Grid {
       ev.stopPropagation();
       delete this.larguras[pux.closest('th').dataset.c];
       this._salvaLarguras(); this.render();
+    });
+
+    this.el.addEventListener('change', ev => {
+      const t = ev.target.closest('[data-todos]');
+      if (t) {
+        const todos = this.visiveis();
+        const vis = this.porPagina
+          ? todos.slice((this.pagina - 1) * this.porPagina,
+                        this.pagina * this.porPagina)
+          : todos;
+        if (t.checked) vis.forEach(x => this.selecao.add(x.id));
+        else vis.forEach(x => this.selecao.delete(x.id));
+        this.render(); this._avisaSelecao(); return;
+      }
+      const c = ev.target.closest('[data-sel]');
+      if (c) {
+        const id = Number(c.dataset.sel);
+        c.checked ? this.selecao.add(id) : this.selecao.delete(id);
+        c.closest('tr').classList.toggle('sel', c.checked);
+        this._avisaSelecao();
+      }
     });
 
     window.addEventListener('resize', () => this._ajusta());

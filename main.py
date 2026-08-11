@@ -8,12 +8,16 @@ from db import q
 import auth
 import empresas
 import certificados
+import importacao
+import documentos
 
 app = FastAPI(title="NFCheck", docs_url=None, redoc_url=None)
 BASE = Path(__file__).parent
 app.mount("/static", StaticFiles(directory=BASE / "static"), name="static")
 app.include_router(empresas.router)
 app.include_router(certificados.router)
+app.include_router(importacao.router)
+app.include_router(documentos.router)
 
 class Login(BaseModel):
     email: str

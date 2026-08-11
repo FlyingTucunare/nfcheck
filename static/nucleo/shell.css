@@ -21,9 +21,13 @@
 .shell-ctx{display:flex;align-items:center;gap:var(--e-3);min-width:0;
   padding-left:var(--e-4);border-left:1px solid rgba(255,255,255,.14)}
 .shell-ctx:empty{display:none}
-.shell-volta{display:flex;color:#9DB4CC;padding:6px;border-radius:var(--r-sm);
-  transition:background var(--mov-rapido),color var(--mov-rapido)}
-.shell-volta:hover{background:rgba(255,255,255,.10);color:#fff}
+.shell-volta{display:flex;align-items:center;gap:5px;color:#9DB4CC;
+  padding:6px 10px 6px 6px;border-radius:var(--r-sm);font-size:var(--t-sm);
+  font-weight:var(--p-forte);border:1px solid rgba(255,255,255,.14);
+  transition:background var(--mov-rapido),color var(--mov-rapido),
+  border-color var(--mov-rapido)}
+.shell-volta:hover{background:rgba(255,255,255,.10);color:#fff;
+  border-color:rgba(239,163,58,.5)}
 .shell-sigla{width:34px;height:34px;border-radius:9px;flex-shrink:0;color:#fff;
   font-weight:var(--p-max);font-size:var(--t-sm);display:flex;align-items:center;
   justify-content:center;background:linear-gradient(140deg,var(--marca-laranja),
@@ -53,3 +57,12 @@
 .mod-seta{margin-left:auto;color:var(--txt-3);display:flex;
   transition:color var(--mov),transform var(--mov)}
 @media(max-width:820px){.so-largo{display:none}}
+
+.shell-emp{display:flex;align-items:center;gap:6px}
+.shell-emp a{border-bottom:1px dotted rgba(255,255,255,.3);
+  transition:color var(--mov-rapido),border-color var(--mov-rapido)}
+.shell-emp a:hover{color:var(--marca-ambar);border-color:var(--marca-ambar)}
+.shell-mod{display:inline-flex;align-items:center;gap:5px;color:#8FA9C4;
+  font-weight:var(--p-normal);white-space:nowrap}
+.shell-mod svg{width:13px;height:13px;opacity:.6}
+a.shell-sigla:hover{filter:brightness(1.12)}

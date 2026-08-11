@@ -196,3 +196,27 @@ body.redim{cursor:col-resize;user-select:none}
   cursor:pointer;font-family:inherit;transition:color var(--mov-rapido)}
 .acao-txt:hover{color:var(--acao-hover)}
 .acao-txt svg{width:14px;height:14px}
+
+table.dados tbody tr.sel{background:var(--acao-fraco)}
+table.dados input[type=checkbox]{cursor:pointer;width:15px;height:15px;
+  accent-color:var(--acao)}
+.barra-sel{display:none;align-items:center;gap:var(--e-3);
+  background:var(--marca-tinta);color:#fff;border-radius:var(--r-lg);
+  padding:var(--e-3) var(--e-4);box-shadow:var(--sombra);
+  margin-bottom:var(--e-4);animation:sobe var(--mov-elastico) both}
+.barra-sel.on{display:flex}
+.paginacao{display:flex;align-items:center;gap:var(--e-3);justify-content:center;
+  padding:var(--e-4);border-top:1px solid var(--linha);font-size:var(--t-md)}
+.paginacao .pag-btn{min-width:34px;height:32px;border:1px solid var(--linha);
+  background:var(--sup-1);border-radius:var(--r-sm);cursor:pointer;color:var(--txt);
+  font-size:var(--t-sm);font-weight:var(--p-forte);transition:all var(--mov-rapido)}
+.paginacao .pag-btn:hover:not(:disabled){border-color:var(--acao);color:var(--acao)}
+.paginacao .pag-btn.on{background:var(--acao);border-color:var(--acao);
+  color:var(--acao-txt)}
+.paginacao .pag-btn:disabled{opacity:.35;cursor:not-allowed}
+.barra-sel b{font-family:var(--fonte-num)}
+.barra-sel .btn-2{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.2);
+  color:#fff}
+.barra-sel .btn-2:hover{background:rgba(255,255,255,.2)}
+.barra-sel .btn-3{color:#9DB4CC}
+.barra-sel .btn-3:hover{background:rgba(255,255,255,.1);color:#fff}

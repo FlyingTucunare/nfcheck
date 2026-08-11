@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NFCheck — Importar</title>
+<link rel="icon" href="/static/logo.svg">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/nucleo/tokens.css?v=20260811183705">
+<link rel="stylesheet" href="/static/nucleo/base.css?v=20260811183705">
+<link rel="stylesheet" href="/static/nucleo/shell.css?v=20260811183705">
+<style>
+  .zona{border:2px dashed var(--linha);border-radius:var(--r-xl);padding:var(--e-7);
+    text-align:center;cursor:pointer;transition:border-color var(--mov),
+    background var(--mov);background:var(--sup-1)}
+  .zona:hover,.zona.sobre{border-color:var(--acao);background:var(--acao-fraco)}
+  .zona svg{width:36px;height:36px;color:var(--txt-3);margin-bottom:var(--e-3)}
+  .zona b{display:block;font-size:var(--t-lg);margin-bottom:6px}
+  .barra-p{height:5px;background:var(--sup-3);border-radius:99px;overflow:hidden;
+    margin-top:var(--e-4)}
+  .barra-p i{display:block;height:100%;background:var(--acao);width:0;
+    transition:width .25s ease}
+  .placar{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));
+    gap:1px;background:var(--linha);border:1px solid var(--linha);
+    border-radius:var(--r-lg);overflow:hidden;margin:var(--e-5) 0}
+  .placar div{background:var(--sup-1);padding:var(--e-4);text-align:center}
+  .placar .pv{font-family:var(--fonte-num);font-size:23px;font-weight:var(--p-medio);
+    letter-spacing:-.03em}
+  .placar .pr{font-size:10px;color:var(--txt-2);text-transform:uppercase;
+    letter-spacing:.08em;margin-top:5px;font-weight:var(--p-forte)}
+  .placar .ok .pv{color:var(--ok)} .placar .al .pv{color:var(--aviso)}
+  .placar .er .pv{color:var(--erro)}
+  .secao{margin-top:var(--e-6)}
+  .secao h3{font-size:var(--t-lg);margin-bottom:var(--e-4)}
+</style>
+</head>
+<body>
+<div class="pagina">
+  <div class="pag-cab">
+    <div><h1>Importar documentos</h1>
+      <p>Envie XML e PDF em lote. A empresa é identificada pelo próprio documento.</p></div>
+  </div>
+
+  <div class="zona" id="zona">
+    <div id="zona-txt"></div>
+    <input type="file" id="arq" accept=".zip,.xml,.pdf" multiple style="display:none">
+  </div>
+  <div id="progresso" class="esconde">
+    <div class="barra-p"><i id="pbarra"></i></div>
+    <p class="t3" style="text-align:center;margin-top:var(--e-2)" id="ptxt"></p>
+  </div>
+
+  <div class="aviso aviso-erro" id="erro" style="margin-top:var(--e-4)"></div>
+  <div id="resultado"></div>
+
+  <div class="secao">
+    <h3>Importações anteriores</h3>
+    <div id="hist"></div>
+  </div>
+</div>
+<script src="/static/nucleo/app.js?v=20260811183705"></script>
+<script src="/static/nucleo/shell.js?v=20260811183705"></script>
+<script src="/static/modulos/importacao.js?v=20260811183705"></script>
+</body>
+</html>

@@ -206,6 +206,13 @@ const Icone = {
   lixo:     svg('<path d="M3 6h18M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2m3 0v14' +
                 'a1 1 0 01-1 1H6a1 1 0 01-1-1V6"/>'),
   voltar:   svg('<path d="M3 7v6h6M3.5 13a9 9 0 102-6"/>'),
+  copiar:   svg('<rect x="9" y="9" width="13" height="13" rx="2"/>' +
+                '<path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>'),
+  visto:    svg('<path d="M20 6L9 17l-5-5"/>'),
+  bandeira: svg('<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>' +
+                '<line x1="4" y1="22" x2="4" y2="15"/>'),
+  link:     svg('<path d="M10 13a5 5 0 007.5.5l3-3a5 5 0 00-7-7l-1.7 1.7"/>' +
+                '<path d="M14 11a5 5 0 00-7.5-.5l-3 3a5 5 0 007 7l1.7-1.7"/>'),
 };
 
 /* ---------- menu suspenso ---------- */
@@ -221,8 +228,12 @@ const Menu = {
     document.body.appendChild(m);
 
     const r = alvo.getBoundingClientRect();
-    m.style.top  = (r.bottom + window.scrollY + 6) + 'px';
-    const larg = m.offsetWidth || 210;
+    const alt = m.offsetHeight || 200, larg = m.offsetWidth || 225;
+    const abaixo = window.innerHeight - r.bottom;
+    // abre para cima quando nao ha espaco suficiente abaixo
+    m.style.top = (abaixo < alt + 16 && r.top > alt + 16
+      ? r.top + window.scrollY - alt - 6
+      : r.bottom + window.scrollY + 6) + 'px';
     m.style.left = Math.max(8, Math.min(r.right + window.scrollX - larg,
       window.innerWidth - larg - 8)) + 'px';
 
@@ -254,3 +265,35 @@ function confirma(titulo, texto, onSim, rotulo = 'Confirmar') {
   Modal.abre('modal-confirma');
   return m;
 }
+
+/* ---------- progresso ---------- */
+const Progresso = {
+  abre(titulo, sub){
+    $('#modal-prog')?.remove();
+    const m = document.createElement('div');
+    m.className = 'modal on'; m.id = 'modal-prog';
+    m.innerHTML =
+      '<div class="modal-cx" style="max-width:420px">' +
+        '<div class="modal-corpo" style="text-align:center;padding:var(--e-6)">' +
+          '<h4 style="margin-bottom:6px" id="pg-tit">' + Fmt.escapa(titulo) + '</h4>' +
+          '<p class="t3" id="pg-sub" style="margin:0 0 var(--e-5)">' +
+            Fmt.escapa(sub || '') + '</p>' +
+          '<div style="height:7px;background:var(--sup-3);border-radius:99px;' +
+            'overflow:hidden"><div id="pg-barra" style="height:100%;width:0;' +
+            'background:var(--acao);transition:width .3s ease"></div></div>' +
+          '<div class="colunas" style="justify-content:space-between;' +
+            'margin-top:var(--e-3);font-size:var(--t-sm)">' +
+            '<span class="t3" id="pg-txt">Preparando...</span>' +
+            '<b class="num" id="pg-pct">0%</b></div>' +
+        '</div></div>';
+    document.body.appendChild(m);
+  },
+  atualiza(pct, texto){
+    const b = $('#pg-barra'); if (!b) return;
+    const p = Math.max(0, Math.min(100, Math.round(pct)));
+    b.style.width = p + '%';
+    $('#pg-pct').textContent = p + '%';
+    if (texto) $('#pg-txt').textContent = texto;
+  },
+  fecha(){ $('#modal-prog')?.remove(); },
+};

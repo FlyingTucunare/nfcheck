@@ -162,6 +162,15 @@ def _grava(d, xml_bytes):
       {**d, "xml_path": str(caminho)})
 
 
+def _log(empresa_id, origem, cstat, motivo, nsu_ini, nsu_fim, novos, t0):
+    """Registra todo ciclo, inclusive os que terminam em rejeicao."""
+    q("""INSERT INTO sync_log (empresa_id,origem,cstat,motivo,nsu_inicial,
+                               nsu_final,novos,duracao_ms)
+         VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""",
+      (empresa_id, origem, cstat, (motivo or "")[:300], nsu_ini, nsu_fim, novos,
+       int((time.monotonic() - t0) * 1000)))
+
+
 def sincronizar(empresa_id, origem, ambiente="1"):
     """Um ciclo. Retorna dict com cstat, novos, ultimo_nsu, caught_up, aguardar, halt."""
     ini = time.monotonic()
@@ -172,7 +181,8 @@ def sincronizar(empresa_id, origem, ambiente="1"):
     if not cur:
         return {"halt": True, "mensagem": "cursor inexistente"}
     if cur["pausado"]:
-        return {"halt": True, "mensagem": f"pausado: {cur['pausado_motivo']}"}
+        return {"halt": True, "pausado": True,
+                "mensagem": f"pausado: {cur['pausado_motivo']}"}
 
     # trava de 1h apos consulta vazia: evita cStat 656 (consumo indevido)
     if cur["ultima_vazia"]:
@@ -193,6 +203,7 @@ def sincronizar(empresa_id, origem, ambiente="1"):
         except Exception as e:
             q("""UPDATE cursores_dfe SET status='erro', erro_msg=%s WHERE empresa_id=%s
                  AND origem=%s""", (str(e)[:400], empresa_id, origem))
+            _log(empresa_id, origem, "ERRO", str(e)[:300], nsu, nsu, 0, ini)
             return {"halt": True, "mensagem": str(e)[:200]}
 
     raiz = etree.fromstring(r.content)
@@ -202,9 +213,12 @@ def sincronizar(empresa_id, origem, ambiente="1"):
     mx = _txt(raiz, "maxNSU")
 
     if cstat == "656":
-        q("""UPDATE cursores_dfe SET pausado=TRUE, pausado_motivo=%s, ultimo_cstat=%s
+        # ultima_vazia arma a trava de 1h automaticamente no proximo ciclo
+        q("""UPDATE cursores_dfe SET pausado=TRUE, pausado_motivo=%s, ultimo_cstat=%s,
+               ultima_vazia=NOW(), ultima_sync=NOW()
              WHERE empresa_id=%s AND origem=%s""",
-          ("Consumo indevido. Aguarde 1 hora.", cstat, empresa_id, origem))
+          ("Consumo indevido (656). Aguarde 1 hora.", cstat, empresa_id, origem))
+        _log(empresa_id, origem, cstat, motivo, nsu, nsu, 0, ini)
         return {"halt": True, "cstat": cstat, "mensagem": motivo}
 
     novos = 0
@@ -237,11 +251,7 @@ def sincronizar(empresa_id, origem, ambiente="1"):
       (novo_nsu, int(mx) if mx else None, cstat, caught_up, novos, novos,
        empresa_id, origem))
 
-    q("""INSERT INTO sync_log (empresa_id,origem,cstat,motivo,nsu_inicial,nsu_final,
-                               novos,duracao_ms)
-         VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""",
-      (empresa_id, origem, cstat, motivo[:300], nsu, novo_nsu, novos,
-       int((time.monotonic() - ini) * 1000)))
+    _log(empresa_id, origem, cstat, motivo, nsu, novo_nsu, novos, ini)
 
     return {"cstat": cstat, "motivo": motivo, "novos": novos,
             "ultimo_nsu": novo_nsu, "max_nsu": mx, "caught_up": caught_up}

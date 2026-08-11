@@ -2,6 +2,7 @@ annotated-doc==0.0.5
 annotated-types==0.8.0
 anyio==4.14.2
 bcrypt==5.0.0
+BrazilFiscalReport==1.0.1
 brotli==1.2.0
 certifi==2026.7.22
 cffi==2.1.1
@@ -9,10 +10,12 @@ charset-normalizer==3.4.9
 click==8.4.2
 cryptography==50.0.0
 cssselect2==0.9.0
+defusedxml==0.7.1
 ecdsa==0.19.2
 et_xmlfile==2.0.0
 fastapi==0.141.1
 fonttools==4.63.0
+fpdf2==2.8.8
 h11==0.16.0
 httptools==0.8.0
 idna==3.18
@@ -20,6 +23,7 @@ Jinja2==3.1.6
 lxml==6.1.1
 MarkupSafe==3.0.3
 openpyxl==3.1.5
+phonenumbers==9.0.36
 pillow==12.3.0
 psycopg2-binary==2.9.12
 pyasn1==0.6.4
@@ -29,6 +33,7 @@ pydantic_core==2.46.4
 pydyf==0.12.1
 PyOTP==2.10.0
 pyphen==0.17.2
+python-barcode==0.16.1
 python-dateutil==2.9.0.post0
 python-dotenv==1.2.2
 python-jose==3.5.0
@@ -37,6 +42,7 @@ PyYAML==6.0.3
 qrcode==8.2
 requests==2.34.2
 rsa==4.9.1
+signxml==5.1.0
 six==1.17.0
 starlette==1.6.0
 tinycss2==1.5.1
