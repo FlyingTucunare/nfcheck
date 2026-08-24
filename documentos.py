@@ -47,19 +47,41 @@ def listar(empresa_id: int, de: Optional[str] = None, ate: Optional[str] = None,
         p["bn"] = "".join(ch for ch in busca if ch.isdigit()) or "-"
 
     onde = " AND ".join(f"({c})" for c in cond)
-    itens = q(f"""SELECT d.id,d.chave,d.tipo,d.numero,d.serie,d.emissao,d.valor,
+
+    # Mesma nota pode ter linha de resumo e linha completa (mesma chave,
+    # tipo diferente). Colapsa em 1 linha por chave, priorizando a completa.
+    # Eventos e documentos sem chave nunca sao colapsados entre si.
+    base_cte = """
+        WITH doc AS (
+            SELECT d.*,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY CASE
+                           WHEN d.chave IS NULL OR d.tipo ILIKE '%%evento%%'
+                               THEN 'k' || d.id::text
+                           ELSE d.chave
+                       END
+                       ORDER BY d.resumo ASC, d.id DESC
+                   ) AS rn
+              FROM documentos d
+             WHERE d.empresa_id = %(emp)s
+        )
+    """
+
+    itens = q(f"""{base_cte}
+                  SELECT d.id,d.chave,d.tipo,d.numero,d.serie,d.emissao,d.valor,
                          d.emitente_nome,d.emitente_cnpj,d.manifestacao,
                          d.manifestacao_em,d.resumo,d.situacao,d.papel,d.origem,
                          (d.xml_path IS NOT NULL) AS tem_xml,
                          (d.pdf_path IS NOT NULL) AS tem_pdf
-                    FROM documentos d WHERE {onde}
+                    FROM doc d WHERE d.rn = 1 AND {onde}
                    ORDER BY d.emissao DESC NULLS LAST, d.id DESC
                    LIMIT %(lim)s""", p)
-    tot = q(f"""SELECT COUNT(*) AS n, COALESCE(SUM(d.valor),0) AS soma,
+    tot = q(f"""{base_cte}
+                SELECT COUNT(*) AS n, COALESCE(SUM(d.valor),0) AS soma,
                        COUNT(*) FILTER (WHERE d.manifestacao IS NULL
                                           AND NOT d.resumo) AS pendentes,
                        COUNT(*) FILTER (WHERE d.resumo) AS resumos
-                  FROM documentos d WHERE {onde}""", p, one=True)
+                  FROM doc d WHERE d.rn = 1 AND {onde}""", p, one=True)
     for i in itens:
         i["tipo_rotulo"] = ROTULO.get(i["tipo"], i["tipo"])
     return {"itens": itens, "totais": tot, "truncado": len(itens) >= p["lim"]}
