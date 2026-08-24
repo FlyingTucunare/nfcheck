@@ -269,6 +269,15 @@ def exportar_lote(dados: Lote, u=Depends(auth.exige("baixar"))):
     if any(d["empresa_id"] not in permitidas for d in docs):
         raise HTTPException(403, "Ha documentos fora do seu escopo.")
 
+    # Mesma chave pode ter linha de resumo e linha completa; mantem so a completa.
+    por_chave = {}
+    for d in docs:
+        chave = d["chave"] or f"__sem_chave_{d['id']}"
+        atual = por_chave.get(chave)
+        if atual is None or (atual["resumo"] and not d["resumo"]):
+            por_chave[chave] = d
+    docs = list(por_chave.values())
+
     buf = io.BytesIO()
     incluidos = falhas = 0
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
