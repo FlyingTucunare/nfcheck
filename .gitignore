@@ -5,3 +5,6 @@ __pycache__/
 *.bak_*
 certs/
 *.pfx
+*.bkp_*
+.env.bkp*
+t_*.py

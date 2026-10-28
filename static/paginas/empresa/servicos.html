@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NFCheck — Serviços</title>
+<link rel="icon" href="/static/logo.svg">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/nucleo/tokens.css?v=20260814022400">
+<link rel="stylesheet" href="/static/nucleo/base.css?v=20260814022400">
+<link rel="stylesheet" href="/static/nucleo/shell.css?v=20260814022400">
+<style>
+  .grade2{display:grid;grid-template-columns:1fr 1fr;gap:var(--e-4)}
+  .grade3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--e-4)}
+  .campo-grupo{margin-bottom:var(--e-4)}
+  .dica{font-size:var(--t-xs);color:var(--txt-3);margin-top:5px;line-height:1.45}
+  .sugestao{background:var(--acao-fraco);border:1px solid var(--acao);
+    border-radius:var(--r);padding:var(--e-3) var(--e-4);margin-top:var(--e-2)}
+  .sugestao .tit{font-size:var(--t-xs);font-weight:var(--p-forte);
+    text-transform:uppercase;letter-spacing:.06em;color:var(--acao);
+    margin-bottom:6px;display:flex;align-items:center;gap:6px}
+  .sugestao .par{display:flex;gap:var(--e-5);flex-wrap:wrap}
+  .sugestao .par div{font-size:var(--t-sm)}
+  .sugestao .par b{display:block;font-family:var(--fonte-num);font-size:var(--t-md)}
+  .cartoes{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));
+    gap:var(--e-4)}
+  .cartao{background:var(--sup-1);border:1px solid var(--linha);
+    border-radius:var(--r-lg);padding:var(--e-5);display:flex;flex-direction:column;
+    gap:var(--e-3);transition:border-color var(--mov),box-shadow var(--mov)}
+  .cartao:hover{border-color:var(--linha-forte);box-shadow:var(--sombra-1)}
+  .cartao .topo{display:flex;justify-content:space-between;align-items:flex-start;
+    gap:var(--e-3)}
+  .cartao h3{font-size:var(--t-lg);margin:0;line-height:1.25}
+  .cartao .desc{font-size:var(--t-sm);color:var(--txt-2);line-height:1.5;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .cartao .meta{display:flex;gap:var(--e-4);flex-wrap:wrap;padding-top:var(--e-3);
+    border-top:1px solid var(--linha)}
+  .cartao .meta div{font-size:var(--t-xs)}
+  .cartao .meta .r{color:var(--txt-3);text-transform:uppercase;letter-spacing:.05em;
+    font-size:9.5px;font-weight:var(--p-forte)}
+  .cartao .meta .v{font-family:var(--fonte-num);font-size:var(--t-md);margin-top:2px}
+  .cartao .acoes{display:flex;gap:var(--e-2);justify-content:flex-end}
+  .estrela{background:none;border:0;cursor:pointer;color:var(--txt-3);padding:2px;
+    line-height:0}
+  .estrela.on{color:var(--aviso)}
+  .incompleto{border-left:3px solid var(--aviso)}
+</style>
+</head>
+<body>
+<div class="pagina">
+  <div class="pag-cab">
+    <div><h1>Serviços</h1>
+      <p>Modelos de serviço usados na emissão de NFS-e. Cadastre uma vez e reaproveite.</p></div>
+    <button class="btn btn-1" id="novo"></button>
+  </div>
+
+  <div class="aviso aviso-erro" id="erro"></div>
+  <div id="lista"></div>
+</div>
+
+<script src="/static/nucleo/app.js?v=20260814022400"></script>
+<script src="/static/nucleo/shell.js?v=20260827090000"></script>
+<script src="/static/modulos/servicos.js?v=20260814022400"></script>
+</body>
+</html>

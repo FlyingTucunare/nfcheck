@@ -40,7 +40,9 @@ function pintaKpis(){
   });
 }
 
-const kpiMini = (rot, val, destaque) =>
+/* apoio: linha discreta abaixo do rotulo - o numero grande e o acumulado,
+   o apoio traz o recorte do mes (ou os documentos sem XML) */
+const kpiMini = (rot, val, destaque, apoio) =>
   '<div style="flex:1;min-width:0;text-align:center">' +
     '<div class="num" style="font-size:20px;font-weight:var(--p-forte);' +
       'letter-spacing:-.03em;line-height:1.15;white-space:nowrap;overflow:hidden;' +
@@ -49,6 +51,9 @@ const kpiMini = (rot, val, destaque) =>
     '<div style="font-size:9.5px;color:var(--txt-3);text-transform:uppercase;' +
       'letter-spacing:.06em;margin-top:5px;font-weight:var(--p-forte);' +
       'white-space:nowrap">' + rot + '</div>' +
+    (apoio ? '<div class="num" style="font-size:10px;color:var(--txt-3);' +
+      'margin-top:3px;white-space:nowrap;overflow:hidden;' +
+      'text-overflow:ellipsis">' + apoio + '</div>' : '') +
   '</div>';
 
 const compacto = v => {
@@ -82,11 +87,14 @@ const cartao = e => {
     '<div class="colunas" style="gap:var(--e-2);background:var(--sup-2);' +
       'border:1px solid var(--linha);border-radius:var(--r);' +
       'padding:18px var(--e-2);margin-bottom:14px">' +
-      kpiMini('Docs', Fmt.numero(e.docs_mes)) +
+      kpiMini('Docs', Fmt.numero(e.docs_total || 0),
+              false, Fmt.numero(e.docs_mes || 0) + ' no mês') +
       '<span style="width:1px;align-self:stretch;background:var(--linha)"></span>' +
-      kpiMini('Valor', compacto(e.valor_mes)) +
+      kpiMini('Valor', compacto(e.valor_total || 0),
+              false, compacto(e.valor_mes || 0) + ' no mês') +
       '<span style="width:1px;align-self:stretch;background:var(--linha)"></span>' +
-      kpiMini('Manifestar', Fmt.numero(e.pendentes), e.pendentes > 0) +
+      kpiMini('Manifestar', Fmt.numero(e.pendentes), e.pendentes > 0,
+              e.resumos ? Fmt.numero(e.resumos) + ' sem XML' : '') +
     '</div>' +
 
     '<div class="colunas" style="font-size:10.5px;color:var(--txt-3);gap:var(--e-3);' +
@@ -95,8 +103,10 @@ const cartao = e => {
         '<b class="num" style="color:var(--txt-2)">' + Fmt.numero(e.nsu_nfe || 0) +
         '</b> · <b class="num" style="color:var(--txt-2)">' + Fmt.numero(e.nsu_cte || 0) +
         '</b></span>' +
-      '<span class="empurra">' + (e.pausado ? 'Pausado'
-        : 'Sinc. ' + Fmt.relativo(e.ultima_sync)) + '</span>' +
+      '<span class="empurra">' + (e.pausado
+        ? 'Pausado'
+        : (e.ultima_sync ? 'Sinc. ' + Fmt.relativo(e.ultima_sync)
+                         : 'Nunca sincronizou')) + '</span>' +
     '</div>' +
 
     '<div class="colunas" style="border-top:1px solid var(--linha);padding-top:16px;' +
@@ -110,8 +120,57 @@ const cartao = e => {
           Icone.lapis + 'Editar</button>' : '') +
         '<span class="acao-txt">Abrir' + Icone.seta + '</span>' +
       '</span>' +
-    '</div></div>';
+    '</div>' +
+    (Sessao.pode('empresa_escrever')
+      ? '<div class="colunas dfe-linha" data-parar>' +
+          '<span class="dfe-rot">Busca de documentos' +
+            '<span class="dfe-sub">NF-e e CT-e' +
+            (e.resumos ? ' · ' + Fmt.numero(e.resumos) + ' sem XML' : '') +
+            '</span></span>' +
+          '<span class="empurra">' +
+            '<button class="chave' + (e.pausado ? '' : ' on') + '" ' +
+              'data-dfe="' + e.id + '" role="switch" aria-checked="' +
+              (e.pausado ? 'false' : 'true') + '" ' +
+              'aria-label="Ligar ou desligar a busca de documentos">' +
+              '<span class="bolinha"></span></button>' +
+          '</span>' +
+        '</div>' +
+        '<div class="colunas dfe-linha" data-parar style="border-top:0;' +
+          'padding-top:8px;margin-top:0">' +
+          '<span class="dfe-rot">Ciência automática' +
+            '<span class="dfe-sub">traz o XML completo sem esperar</span></span>' +
+          '<span class="empurra">' +
+            '<button class="chave' + (e.ciencia_auto ? ' on' : '') + '" ' +
+              'data-ciencia="' + e.id + '" role="switch" aria-checked="' +
+              (e.ciencia_auto ? 'true' : 'false') + '" ' +
+              'aria-label="Ligar ou desligar a ciencia automatica">' +
+              '<span class="bolinha"></span></button>' +
+          '</span>' +
+        '</div>'
+      : '') +
+    '</div>';
 };
+
+/* switch do DFe: nao havia componente de toggle no nucleo */
+if (!document.getElementById('css-dfe')) {
+  const s = document.createElement('style');
+  s.id = 'css-dfe';
+  s.textContent =
+    '.dfe-linha{border-top:1px solid var(--linha);padding-top:12px;margin-top:12px;' +
+      'align-items:center}' +
+    '.dfe-rot{font-size:var(--t-sm);color:var(--txt-2);line-height:1.3}' +
+    '.dfe-sub{display:block;font-size:var(--t-xs);color:var(--txt-3);margin-top:2px}' +
+    '.chave{width:42px;height:24px;border-radius:12px;border:1px solid var(--linha-forte);' +
+      'background:var(--sup-3);cursor:pointer;padding:0;position:relative;' +
+      'transition:background var(--mov),border-color var(--mov);flex:none}' +
+    '.chave .bolinha{position:absolute;top:2px;left:2px;width:18px;height:18px;' +
+      'border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(6,30,56,.28);' +
+      'transition:transform var(--mov)}' +
+    '.chave.on{background:var(--acao);border-color:var(--acao)}' +
+    '.chave.on .bolinha{transform:translateX(18px)}' +
+    '.chave:disabled{opacity:.55;cursor:progress}';
+  document.head.appendChild(s);
+}
 
 const COLUNAS = [
   {k:'razao_social', t:'Empresa', w:250, cel: e =>
@@ -129,10 +188,17 @@ const COLUNAS = [
   }},
   {k:'cert_ate', t:'Validade', w:105, cel: e =>
     '<span class="num">' + Fmt.data(e.cert_ate) + '</span>'},
+  {k:'docs_total', t:'Docs total', w:100, num:true, cel: e =>
+    '<span class="num">' + Fmt.numero(e.docs_total || 0) + '</span>'},
+  {k:'valor_total', t:'Valor total', w:140, num:true, cel: e =>
+    '<span class="num">' + Fmt.moeda(e.valor_total || 0) + '</span>'},
   {k:'docs_mes', t:'Docs mês', w:95, num:true, cel: e =>
     '<span class="num">' + Fmt.numero(e.docs_mes) + '</span>'},
   {k:'valor_mes', t:'Valor mês', w:125, num:true, cel: e =>
     '<span class="num">' + Fmt.moeda(e.valor_mes) + '</span>'},
+  {k:'resumos', t:'Sem XML', w:95, num:true, cel: e =>
+    '<span class="num" style="' + (e.resumos > 0 ? 'color:var(--aviso)' : '') +
+      '">' + Fmt.numero(e.resumos || 0) + '</span>'},
   {k:'pendentes', t:'A manifestar', w:110, num:true, cel: e =>
     '<span class="num" style="' + (e.pendentes > 0 ? 'color:var(--aviso);' +
       'font-weight:var(--p-forte)' : '') + '">' + Fmt.numero(e.pendentes) + '</span>'},
@@ -258,6 +324,18 @@ async function carregar(){
     }
     const c = ev.target.closest('[data-cert]');
     if (c) { ev.stopPropagation(); toast('Módulo de certificado em construção.'); }
+    const sw = ev.target.closest('[data-dfe]');
+    if (sw) {
+      ev.stopPropagation();
+      const emp = DADOS.find(x => String(x.id) === sw.dataset.dfe);
+      if (emp) alternaDfe(sw, emp);
+    }
+    const ci = ev.target.closest('[data-ciencia]');
+    if (ci) {
+      ev.stopPropagation();
+      const emp = DADOS.find(x => String(x.id) === ci.dataset.ciencia);
+      if (emp) alternaCiencia(ci, emp);
+    }
   });
 
   try { await carregar(); }
@@ -265,12 +343,207 @@ async function carregar(){
 })();
 
 /* ---------- acoes da empresa ---------- */
+/* ---------- busca de documentos (DFe) ---------- */
+async function alternaDfe(botao, e){
+  const ligando = !!e.pausado;
+  botao.disabled = true;
+  try {
+    const r = await api.post('/api/empresas/' + e.id + '/dfe', {ligar: ligando});
+    if (r.confirmar){
+      botao.disabled = false;
+      confirmaReligar(e, r.motivo);
+      return;
+    }
+    e.pausado = !ligando;
+    botao.classList.toggle('on', !e.pausado);
+    botao.setAttribute('aria-checked', String(!e.pausado));
+    toast(ligando
+      ? 'Busca de documentos ligada. A sincronização começa agora.'
+      : 'Busca de documentos desligada.');
+    setTimeout(carregar, 1500);
+  } catch(err){ toast(err.message); }
+  finally { botao.disabled = false; }
+}
+
+/* a pausa pode ter sido posta por decisao humana (ex: outro sistema ja
+   consome o mesmo CNPJ). Religar sem saber disso faz dois sistemas
+   disputarem o mesmo NSU e um deles perde documentos. */
+function confirmaReligar(e, motivo){
+  Modal.cria({
+    id:'m-dfe', titulo:'Religar a busca de documentos',
+    corpo:
+      '<div class="aviso aviso-atencao on" style="margin-bottom:var(--e-4)">' +
+        'Esta empresa foi pausada por um motivo específico:<br><b>' +
+        Fmt.escapa(motivo) + '</b></div>' +
+      '<p style="font-size:var(--t-sm);line-height:1.65">Se outro sistema já ' +
+      'consome os documentos deste CNPJ, ligar aqui faz os dois disputarem o ' +
+      'mesmo NSU — e um deles deixa de receber notas.</p>' +
+      '<p class="t3" style="margin-top:var(--e-3)">Confirme apenas se tiver ' +
+      'certeza de que o motivo acima não vale mais.</p>',
+    acoes:[
+      {txt:'Cancelar', cls:'btn-2'},
+      {txt:'Religar mesmo assim', cls:'btn-perigo', fn: async () => {
+        try {
+          await api.post('/api/empresas/' + e.id + '/dfe',
+                         {ligar:true, forcar:true});
+          Modal.fecha('m-dfe');
+          toast('Busca de documentos ligada.');
+          await carregar();
+        } catch(err){ toast(err.message); }
+      }},
+    ],
+  });
+  Modal.abre('m-dfe');
+}
+
+/* ---------- ciencia automatica ----------
+   Sem manifestar, o destinatario recebe so o RESUMO da NF-e - sem XML, sem
+   DANFE. Com a ciencia automatica o sistema manifesta e busca o documento
+   completo por chave, em segundos.
+   E ato formal perante a SEFAZ (reversivel, mas registrado), por isso e
+   opcional e fica a cargo de quem responde pela empresa. */
+async function alternaCiencia(botao, e){
+  const ligando = !e.ciencia_auto;
+  if (ligando) return confirmaCiencia(e);
+  botao.disabled = true;
+  try {
+    await api.put('/api/empresas/' + e.id + '/sincronizacao',
+                  {herdar:false, ciencia_auto:false,
+                   janela_ativa:e.janela_ativa, janela_inicio:e.janela_inicio,
+                   janela_fim:e.janela_fim});
+    e.ciencia_auto = false;
+    botao.classList.remove('on');
+    botao.setAttribute('aria-checked','false');
+    toast('Ciência automática desligada.');
+  } catch(err){ toast(err.message); }
+  finally { botao.disabled = false; }
+}
+
+function confirmaCiencia(e){
+  Modal.cria({
+    id:'m-ciencia', titulo:'Ligar ciência automática',
+    corpo:
+      '<p style="font-size:var(--t-sm);line-height:1.65">O sistema vai ' +
+        'manifestar <b>Ciência da Operação</b> nas NF-e recebidas por ' +
+        Fmt.escapa(e.razao_social) + ' e buscar o XML completo em seguida.</p>' +
+      (e.resumos
+        ? '<div class="aviso aviso-atencao on" style="margin:var(--e-4) 0">' +
+          Fmt.numero(e.resumos) + ' documento(s) desta empresa estão sem XML ' +
+          'hoje por falta de manifestação.</div>' : '') +
+      '<p class="t3" style="line-height:1.65">A ciência é reversível e não ' +
+        'confirma a operação — apenas declara que a empresa tomou ' +
+        'conhecimento da nota. Ainda assim é um ato registrado na SEFAZ: ' +
+        'confirme com quem responde pela empresa.</p>',
+    acoes:[
+      {txt:'Cancelar', cls:'btn-2'},
+      {txt:'Ligar ciência automática', cls:'btn-1', fn: async () => {
+        try {
+          await api.put('/api/empresas/' + e.id + '/sincronizacao',
+                        {herdar:false, ciencia_auto:true,
+                         janela_ativa:e.janela_ativa,
+                         janela_inicio:e.janela_inicio, janela_fim:e.janela_fim});
+          Modal.fecha('m-ciencia');
+          toast('Ciência automática ligada.');
+          await carregar();
+        } catch(err){ toast(err.message); }
+      }},
+    ],
+  });
+  Modal.abre('m-ciencia');
+}
+
+/* ---------- acesso do dono da empresa ---------- */
+async function acessoCliente(e){
+  let jaTem = [];
+  try { jaTem = await api.get('/api/usuarios/empresa/' + e.id + '/clientes'); }
+  catch(err){}
+
+  Modal.cria({
+    id:'m-cli', titulo:'Dar acesso ao cliente',
+    corpo:
+      '<p class="t3" style="line-height:1.6;margin-bottom:var(--e-4)">' +
+        'Cria um acesso para o responsável por <b>' +
+        Fmt.escapa(e.razao_social) + '</b> consultar as notas da própria ' +
+        'empresa. Se a pessoa já tiver acesso, esta empresa é adicionada ' +
+        'ao login dela.</p>' +
+      (jaTem.length
+        ? '<div style="background:var(--sup-2);border:1px solid var(--linha);' +
+          'border-radius:var(--r);padding:var(--e-3) var(--e-4);' +
+          'margin-bottom:var(--e-4)">' +
+          '<div class="t3" style="margin-bottom:6px">Já têm acesso a esta empresa</div>' +
+          jaTem.map(x => '<div style="font-size:var(--t-sm)">' +
+            Fmt.escapa(x.nome) + ' <span class="t3">· ' +
+            Fmt.escapa(x.email) + '</span></div>').join('') +
+          '</div>'
+        : '') +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--e-4)">' +
+        '<div style="margin-bottom:var(--e-4)"><label class="rotulo">Nome</label>' +
+          '<input class="campo" id="c-nome" maxlength="40"></div>' +
+        '<div style="margin-bottom:var(--e-4)"><label class="rotulo">Sobrenome</label>' +
+          '<input class="campo" id="c-sobre" maxlength="60"></div>' +
+      '</div>' +
+      '<div style="margin-bottom:var(--e-4)"><label class="rotulo">E-mail</label>' +
+        '<input class="campo" type="email" id="c-email" maxlength="80"></div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--e-4)">' +
+        '<div style="margin-bottom:var(--e-4)"><label class="rotulo">Telefone</label>' +
+          '<input class="campo" id="c-tel" maxlength="16" ' +
+            'placeholder="(11) 90000-0000"></div>' +
+        '<div style="margin-bottom:var(--e-4)">' +
+          '<label class="rotulo">CPF (opcional)</label>' +
+          '<input class="campo" id="c-cpf" maxlength="14"></div>' +
+      '</div>' +
+      '<div class="aviso aviso-erro" id="c-erro"></div>',
+    acoes:[
+      {txt:'Cancelar', cls:'btn-2'},
+      {txt:'Dar acesso', cls:'btn-1', id:'b-cli', fn: async () => {
+        const fe = $('#c-erro'); fe.classList.remove('on');
+        const mostra = m => { fe.textContent = m; fe.classList.add('on'); };
+        const nome = $('#c-nome').value.trim();
+        const sobre = $('#c-sobre').value.trim();
+        const email = $('#c-email').value.trim();
+        const tel = ($('#c-tel').value || '').replace(/\D/g, '');
+        if (!nome || !sobre) return mostra('Informe nome e sobrenome.');
+        if (!/^[^@\s]+@[^@\s]+\.[a-zA-Z]{2,}$/.test(email))
+          return mostra('Informe um e-mail válido.');
+        if (tel.length < 10) return mostra('Informe o telefone com DDD.');
+
+        const b = $('#b-cli'); b.disabled = true; b.textContent = 'Enviando…';
+        try {
+          const d = await api.post('/api/usuarios/acesso-cliente', {
+            empresa_id: e.id, nome, sobrenome: sobre, email, telefone: tel,
+            cpf: ($('#c-cpf').value || '').replace(/\D/g, '') || null,
+          });
+          Modal.fecha('m-cli');
+          if (d.situacao === 'ja_tinha')
+            toast(d.nome + ' já tinha acesso a esta empresa.');
+          else if (d.situacao === 'empresa_adicionada')
+            toast(d.nome + ' já tinha acesso — ' + Fmt.escapa(d.empresa) +
+                  ' foi adicionada' + (d.email_enviado ? ' e ele foi avisado.' : '.'));
+          else
+            toast('Acesso criado' + (d.email_enviado
+              ? ' e enviado para ' + email : '. Senha: ' + d.senha));
+        } catch(err){
+          mostra(err.message);
+          b.disabled = false; b.textContent = 'Dar acesso';
+        }
+      }},
+    ],
+  });
+  Modal.abre('m-cli');
+  setTimeout(() => $('#c-nome').focus(), 60);
+}
+
 function menuEmpresa(botao, e){
   const itens = [];
   if (Sessao.pode('empresa_escrever')) {
     itens.push({txt:'Editar dados', icone:'lapis', fn:() => modalEditar(e)});
     itens.push({txt:'Atualizar pela Receita', icone:'sync', fn:() => atualizarReceita(e)});
     itens.push({txt:'Sincronização', icone:'relogio', fn:() => modalSync(e)});
+    itens.push({sep:true});
+  }
+  if (Sessao.pode('usuario_escrever')) {
+    itens.push({txt:'Dar acesso ao cliente', icone:'usuarios',
+      fn:() => acessoCliente(e)});
     itens.push({sep:true});
   }
   itens.push({txt:'Abrir empresa', icone:'seta',

@@ -135,6 +135,14 @@ def listar(arquivadas: bool = False, u=Depends(auth.usuario_atual)):
          WHERE empresa_id = ANY(%(ids)s)
            AND emissao >= date_trunc('month', NOW() AT TIME ZONE 'America/Sao_Paulo')
          GROUP BY empresa_id
+      ), tot AS (
+        SELECT empresa_id,
+               COUNT(*)                       AS docs_total,
+               COALESCE(SUM(valor),0)         AS valor_total,
+               COUNT(*) FILTER (WHERE resumo) AS resumos
+          FROM documentos
+         WHERE empresa_id = ANY(%(ids)s)
+         GROUP BY empresa_id
       ), cur AS (
         SELECT empresa_id,
                MAX(ultima_sync)                                        AS ultima_sync,
@@ -156,6 +164,9 @@ def listar(arquivadas: bool = False, u=Depends(auth.usuario_atual)):
              COALESCE(m.docs_mes,0)  AS docs_mes,
              COALESCE(m.valor_mes,0) AS valor_mes,
              COALESCE(m.pendentes,0) AS pendentes,
+             COALESCE(t.docs_total,0)  AS docs_total,
+             COALESCE(t.valor_total,0) AS valor_total,
+             COALESCE(t.resumos,0)     AS resumos,
              cur.ultima_sync, cur.nsu_nfe, cur.nsu_cte,
              COALESCE(cur.pausado,FALSE) AS pausado,
              cf.janela_ativa, cf.janela_inicio, cf.janela_fim,
@@ -164,6 +175,7 @@ def listar(arquivadas: bool = False, u=Depends(auth.usuario_atual)):
       FROM empresas e
       LEFT JOIN certificados c ON c.empresa_id=e.id AND c.ativo
       LEFT JOIN mes m   ON m.empresa_id=e.id
+      LEFT JOIN tot t   ON t.empresa_id=e.id
       LEFT JOIN cur     ON cur.empresa_id=e.id
       LEFT JOIN config_efetiva cf ON cf.empresa_id=e.id
       WHERE e.id = ANY(%(ids)s)
@@ -195,6 +207,81 @@ def config_sync(empresa_id: int, dados: ConfigSync, request: Request,
            dados.janela_fim or None, dados.ciencia_auto, empresa_id))
     _aud(u, "config_sincronizacao", empresa_id, dados.model_dump(), request)
     return q("SELECT * FROM config_efetiva WHERE empresa_id=%s", (empresa_id,), one=True)
+
+
+class SwitchDfe(BaseModel):
+    ligar: bool
+    forcar: bool = False       # religa mesmo com pausa de motivo desconhecido
+
+
+MARCA_SWITCH = "Desligado no painel"
+
+
+@router.get("/{empresa_id}/dfe")
+def dfe_situacao(empresa_id: int, u=Depends(auth.exige("ver"))):
+    """Situacao das tres origens de documentos desta empresa."""
+    auth.exige_empresa(u, empresa_id)
+    cur = q("""SELECT origem, pausado, pausado_motivo, ultima_sync, ultimo_nsu,
+                 caught_up
+               FROM cursores_dfe WHERE empresa_id=%s ORDER BY origem""",
+            (empresa_id,))
+    if not cur:
+        return {"ligado": False, "origens": [], "sem_cursor": True}
+
+    pausadas = [c for c in cur if c["pausado"]]
+    # pausa que NAO foi posta pelo switch e decisao deliberada de alguem
+    externas = [c["pausado_motivo"] for c in pausadas
+                if c["pausado_motivo"] and MARCA_SWITCH not in c["pausado_motivo"]]
+    return {"ligado": not pausadas, "origens": cur,
+            "motivo_externo": externas[0] if externas else None}
+
+
+@router.post("/{empresa_id}/dfe")
+def dfe_switch(empresa_id: int, dados: SwitchDfe, request: Request,
+               u=Depends(auth.exige("empresa_escrever"))):
+    """Liga ou desliga a busca de documentos (NF-e, CT-e e NFS-e de uma vez).
+
+    Ao ligar, a sincronizacao comeca IMEDIATAMENTE (proxima_sync=now) - o
+    usuario ve o resultado sem esperar a fila.
+
+    Se a empresa estiver pausada por um motivo que nao veio deste switch
+    (ex: "CNPJ ja consumido por outro sistema"), religar exige forcar=true:
+    duas ferramentas puxando o mesmo NSU fazem uma perder documentos.
+    """
+    auth.exige_empresa(u, empresa_id)
+    emp = q("SELECT razao_social FROM empresas WHERE id=%s", (empresa_id,), one=True)
+    if not emp:
+        raise HTTPException(404, "Empresa nao encontrada")
+
+    cur = q("""SELECT origem, pausado, pausado_motivo FROM cursores_dfe
+               WHERE empresa_id=%s""", (empresa_id,))
+    if not cur:
+        raise HTTPException(400,
+            "Esta empresa ainda nao tem cursores de sincronizacao configurados.")
+
+    if dados.ligar:
+        externas = [c["pausado_motivo"] for c in cur
+                    if c["pausado"] and c["pausado_motivo"]
+                    and MARCA_SWITCH not in c["pausado_motivo"]]
+        if externas and not dados.forcar:
+            return {"ok": False, "confirmar": True, "motivo": externas[0],
+                    "aviso": "Esta empresa foi pausada por outro motivo. "
+                             "Confirme para religar mesmo assim."}
+        if not q("""SELECT id FROM certificados
+                    WHERE empresa_id=%s AND ativo""", (empresa_id,), one=True):
+            raise HTTPException(400,
+                "A empresa precisa de um certificado digital ativo para "
+                "buscar documentos.")
+        q("""UPDATE cursores_dfe SET pausado=false, pausado_motivo=NULL,
+               proxima_sync=now() WHERE empresa_id=%s""", (empresa_id,))
+    else:
+        motivo = f"{MARCA_SWITCH} por {u['nome']}"
+        q("""UPDATE cursores_dfe SET pausado=true, pausado_motivo=%s
+             WHERE empresa_id=%s""", (motivo, empresa_id))
+
+    _aud(u, "dfe_ligado" if dados.ligar else "dfe_desligado", empresa_id,
+         {"empresa": emp["razao_social"], "forcado": dados.forcar}, request)
+    return {"ok": True, "ligado": dados.ligar}
 
 
 @router.get("/config/escritorio")
@@ -341,6 +428,88 @@ def excluir(empresa_id: int, confirmacao: str, request: Request,
        request.client.host if request.client else None))
     q("DELETE FROM empresas WHERE id=%s", (empresa_id,))
     return {"ok": True}
+
+
+class DadosFiscais(BaseModel):
+    """Campos que NAO vem da Receita - sao digitados e sao criticos:
+    sem inscricao municipal nao se emite NFS-e."""
+    ie: str | None = None
+    im: str | None = None
+    regime_tributario: str | None = None
+    simples_optante: bool | None = None
+    telefone1: str | None = None
+    email: str | None = None
+    observacoes: str | None = None
+
+
+@router.get("/{empresa_id}/ficha")
+def ficha(empresa_id: int, u=Depends(auth.usuario_atual)):
+    """Ficha cadastral completa + pendencias que impedem operar."""
+    auth.exige_empresa(u, empresa_id)
+    e = q("""SELECT e.*, m.provedor_nfse, m.giss_slug
+             FROM empresas e
+             LEFT JOIN municipios m ON m.codigo_ibge = e.municipio_ibge
+             WHERE e.id=%s""", (empresa_id,), one=True)
+    if not e:
+        raise HTTPException(404, "Empresa nao encontrada")
+
+    cnaes = q("""SELECT codigo, descricao, principal FROM empresa_cnaes
+                 WHERE empresa_id=%s ORDER BY principal DESC, codigo""",
+              (empresa_id,))
+    try:
+        socios = q("""SELECT * FROM empresa_socios WHERE empresa_id=%s
+                      ORDER BY nome""", (empresa_id,))
+    except Exception:
+        socios = []
+
+    cert = q("""SELECT id, titular_cn, valido_ate,
+                  (valido_ate::date - current_date) AS dias
+                FROM certificados WHERE empresa_id=%s AND ativo
+                ORDER BY id DESC LIMIT 1""", (empresa_id,), one=True)
+
+    pend = []
+    if not cert:
+        pend.append({"tipo": "erro", "txt": "Sem certificado digital ativo. "
+                     "Sem ele não há busca de documentos nem emissão."})
+    elif cert["dias"] is not None and cert["dias"] < 0:
+        pend.append({"tipo": "erro", "txt": "Certificado digital vencido."})
+    elif cert["dias"] is not None and cert["dias"] <= 30:
+        pend.append({"tipo": "aviso",
+                     "txt": f"Certificado vence em {cert['dias']} dia(s)."})
+    if not e.get("im"):
+        pend.append({"tipo": "aviso", "txt": "Sem inscrição municipal. "
+                     "É obrigatória para emitir NFS-e."})
+    if not e.get("municipio_ibge"):
+        pend.append({"tipo": "erro", "txt": "Sem município definido."})
+    elif not e.get("provedor_nfse"):
+        pend.append({"tipo": "aviso",
+                     "txt": f"O município {e.get('municipio_nome') or ''} ainda não "
+                            f"tem provedor de NFS-e configurado no sistema."})
+    sit = (e.get("situacao_cadastral") or "").upper()
+    if sit and sit not in ("ATIVA", "ATIVO"):
+        pend.append({"tipo": "erro",
+                     "txt": f"Situação cadastral na Receita: {e['situacao_cadastral']}."})
+
+    return {"empresa": e, "cnaes": cnaes, "socios": socios,
+            "certificado": cert, "pendencias": pend}
+
+
+@router.put("/{empresa_id}/fiscal")
+def salvar_fiscal(empresa_id: int, d: DadosFiscais, request: Request,
+                  u=Depends(auth.exige("empresa_escrever"))):
+    """Salva o que a Receita nao fornece. Nao toca nos campos vindos do CNPJ:
+    esses so mudam via 'atualizar pela Receita'."""
+    auth.exige_empresa(u, empresa_id)
+    r = q("""UPDATE empresas SET ie=%s, im=%s, regime_tributario=%s,
+               simples_optante=COALESCE(%s, simples_optante),
+               telefone1=%s, email=%s, observacoes=%s
+             WHERE id=%s
+             RETURNING id, ie, im, regime_tributario, simples_optante""",
+          (d.ie or None, d.im or None, d.regime_tributario or None,
+           d.simples_optante, d.telefone1 or None, d.email or None,
+           d.observacoes or None, empresa_id), one=True)
+    _aud(u, "dados_fiscais_alterados", empresa_id, d.model_dump(), request)
+    return r
 
 
 @router.get("/{empresa_id}/resumo")

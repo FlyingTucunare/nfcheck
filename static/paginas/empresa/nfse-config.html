@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NFCheck — Configuração de NFS-e</title>
+<link rel="icon" href="/static/logo.svg">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/nucleo/tokens.css?v=20260827090000">
+<link rel="stylesheet" href="/static/nucleo/base.css?v=20260827090000">
+<link rel="stylesheet" href="/static/nucleo/shell.css?v=20260827090000">
+<style>
+  .bloco{padding:var(--e-5)}
+  .bloco h3{font-size:var(--t-lg);margin-bottom:var(--e-4)}
+  .duasc{display:grid;grid-template-columns:1fr 1fr;gap:var(--e-4)}
+  @media(max-width:720px){.duasc{grid-template-columns:1fr}}
+  .marca-ativo{border:1px solid var(--linha);border-radius:var(--r);
+    padding:var(--e-4);margin-top:var(--e-5);background:var(--sup-2)}
+  .marca-ativo label{display:flex;gap:var(--e-2);align-items:flex-start;cursor:pointer}
+  .esconde{display:none !important}
+</style>
+</head>
+<body>
+<div class="pagina">
+  <div class="pag-cab">
+    <div><h1>Configuração de emissão de NFS-e</h1>
+      <p>Série, numeração e regras fiscais usadas em toda nota emitida por esta empresa.</p></div>
+  </div>
+  <div id="alerta-topo"></div>
+  <div class="painel bloco">
+    <div class="aviso aviso-erro" id="cfg-erro"></div>
+    <form onsubmit="return false" autocomplete="off">
+      <div class="duasc">
+        <div class="grupo">
+          <label class="rotulo" for="f-ambiente">Ambiente</label>
+          <select class="campo" id="f-ambiente">
+            <option value="1">Produção</option>
+            <option value="2">Homologação</option>
+          </select>
+        </div>
+        <div class="grupo">
+          <label class="rotulo" for="f-serie">Série do DPS</label>
+          <input class="campo" id="f-serie" placeholder="00001">
+        </div>
+        <div class="grupo">
+          <label class="rotulo" for="f-numero">Próximo número (RPS/DPS)</label>
+          <input class="campo" type="number" min="1" id="f-numero">
+        </div>
+        <div class="grupo">
+          <label class="rotulo" for="f-aliquota">Alíquota ISS padrão (%)</label>
+          <input class="campo" type="number" step="0.01" min="0" max="100" id="f-aliquota"
+                 placeholder="Ex: 5.00">
+        </div>
+      </div>
+      <div class="grupo">
+        <label class="rotulo" for="f-regime">Regime especial de tributação</label>
+        <input class="campo" id="f-regime" placeholder="Deixe em branco se não houver">
+      </div>
+      <div class="grupo">
+        <label class="rotulo" for="f-obs">Observação padrão da nota</label>
+        <textarea class="campo" id="f-obs" rows="2"
+                  placeholder="Texto que entra em toda nota, se desejado"></textarea>
+      </div>
+      <div style="display:flex;gap:var(--e-5);flex-wrap:wrap;margin-top:var(--e-2)">
+        <label class="colunas" style="gap:var(--e-2);cursor:pointer">
+          <input type="checkbox" id="f-simples"><span>Optante do Simples Nacional</span></label>
+        <label class="colunas" style="gap:var(--e-2);cursor:pointer">
+          <input type="checkbox" id="f-incentivo"><span>Incentivo fiscal municipal</span></label>
+        <label class="colunas" style="gap:var(--e-2);cursor:pointer">
+          <input type="checkbox" id="f-retido"><span>ISS retido por padrão</span></label>
+      </div>
+      <div class="marca-ativo">
+        <label>
+          <input type="checkbox" id="f-ativo" style="margin-top:3px">
+          <span><b>Ativar emissão de NFS-e para esta empresa</b><br>
+          <span class="t3">Só marque depois de conferir todos os dados acima com o
+          contador responsável. Enquanto estiver desmarcado, a emissão continua
+          bloqueada para esta empresa.</span></span>
+        </label>
+      </div>
+      <button class="btn btn-1" id="f-salvar" style="width:100%;margin-top:var(--e-5)"
+              >Salvar configuração</button>
+    </form>
+  </div>
+</div>
+<script src="/static/nucleo/app.js?v=20260827090000"></script>
+<script src="/static/nucleo/shell.js?v=20260827090000"></script>
+<script src="/static/modulos/nfse-config.js?v=20260827090000"></script>
+</body>
+</html>

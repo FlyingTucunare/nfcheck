@@ -17,6 +17,7 @@
 */
 
 class Grid {
+  static TETO = 1000;
   constructor(cfg) {
     this.cfg     = cfg;
     this.el      = typeof cfg.alvo === 'string' ? $(cfg.alvo) : cfg.alvo;
@@ -35,6 +36,9 @@ class Grid {
     this.auto = cfg.porPagina === 'auto';
     this.porPagina = this.auto ? 20 : (cfg.porPagina || 0);
     this.pagina = 1;
+    // escolha manual de quantos itens mostrar (0 = automatico pela altura)
+    const qtdSalva = Number(localStorage.getItem('nfc_qtd_' + this.chave) || 0);
+    if (qtdSalva) { this.porPagina = qtdSalva; this.auto = false; }
     if (this.auto) {
       let t;
       window.addEventListener('resize', () => {
@@ -105,13 +109,45 @@ class Grid {
       : l;
     this.el.innerHTML = (this.visao === 'cartoes' && this.cfg.cartao
       ? this._cartoes(pag) : this._tabela(pag)) + this._paginacao(l.length);
+    this._ligaQtd();
     this._ligaLinhas();
     this._ligaPaginacao();
     if (this.visao === 'tabela') this._ajusta();
   }
 
+  _seletorQtd(total){
+    const atual = this.auto ? 0 : this.porPagina;
+    const opcoes = [20, 50, 100, 200, Grid.TETO];
+    return '<span class="qtd-itens">Mostrar ' +
+      '<select data-qtd>' +
+        '<option value="0"' + (this.auto ? ' selected' : '') + '>auto</option>' +
+        opcoes.map(n => '<option value="' + n + '"' +
+          (atual === n ? ' selected' : '') + '>' +
+          (n === Grid.TETO ? 'todos' : n) + '</option>').join('') +
+      '</select>' +
+      (this.porPagina === Grid.TETO && total > Grid.TETO
+        ? ' <b style="color:var(--aviso)">' + Grid.TETO + ' de ' + total +
+          ' — refine os filtros</b>' : '') +
+      '</span>';
+  }
+
+  _ligaQtd(){
+    const s = this.el.querySelector('[data-qtd]');
+    if (!s) return;
+    s.onchange = () => {
+      const v = Number(s.value);
+      localStorage.setItem('nfc_qtd_' + this.chave, String(v));
+      if (v === 0) { this.auto = true; this._calculaCabem(); }
+      else { this.auto = false; this.porPagina = v; }
+      this.pagina = 1;
+      this.render();
+    };
+  }
+
   _paginacao(total){
-    if (!this.porPagina || total <= this.porPagina) return '';
+    // sem paginas ainda assim mostra o seletor: e util antes de crescer
+    if (!this.porPagina || total <= this.porPagina)
+      return '<div class="paginacao">' + this._seletorQtd(total) + '</div>';
     const paginas = Math.ceil(total / this.porPagina);
     const p = this.pagina;
     const nums = [];
@@ -130,7 +166,7 @@ class Grid {
     });
     const ini = (p - 1) * this.porPagina + 1;
     const fim = Math.min(p * this.porPagina, total);
-    return '<div class="paginacao">' +
+    return '<div class="paginacao">' + this._seletorQtd(total) +
       '<span class="t3">' + ini + '–' + fim + ' de ' + Fmt.numero(total) + '</span>' +
       '<button class="pag-btn" data-p="' + (p - 1) + '"' +
         (p === 1 ? ' disabled' : '') + '>‹</button>' + botoes +

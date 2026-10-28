@@ -197,6 +197,45 @@ async def enviar(request: Request, empresa_id: int = Form(...), senha: str = For
     return novo
 
 
+@router.get("/panorama")
+def panorama(u=Depends(auth.usuario_atual)):
+    """Uma linha por empresa, com ou sem certificado.
+
+    As empresas SEM certificado sao tao importantes quanto as vencendo -
+    sem ele nao ha busca de documentos nem emissao. Por isso o LEFT JOIN.
+    """
+    ids = [e["id"] for e in auth.empresas_visiveis(u)]
+    if not ids:
+        return []
+    return q("""
+        SELECT e.id AS empresa_id, e.razao_social, e.cnpj, e.municipio_nome, e.uf,
+               ct.id AS certificado_id, ct.titular_cn, ct.cnpj_titular,
+               ct.valido_de, ct.valido_ate, ct.enviado_em,
+               (ct.valido_ate::date - current_date) AS dias,
+               (SELECT count(*) FROM certificados h
+                 WHERE h.empresa_id = e.id) AS historico,
+               EXISTS (SELECT 1 FROM cursores_dfe c
+                        WHERE c.empresa_id = e.id AND NOT c.pausado) AS dfe_ligado
+        FROM empresas e
+        LEFT JOIN certificados ct ON ct.empresa_id = e.id AND ct.ativo
+        WHERE e.id = ANY(%s) AND e.arquivada_em IS NULL
+        ORDER BY
+          CASE WHEN ct.id IS NULL THEN 0
+               WHEN ct.valido_ate < now() THEN 1
+               ELSE 2 END,
+          ct.valido_ate NULLS FIRST, e.razao_social""", (ids,))
+
+
+@router.get("/historico/{empresa_id}")
+def historico(empresa_id: int, u=Depends(auth.usuario_atual)):
+    auth.exige_empresa(u, empresa_id)
+    return q("""SELECT c.id, c.titular_cn, c.cnpj_titular, c.valido_de,
+                  c.valido_ate, c.ativo, c.enviado_em, us.nome AS enviado_por
+                FROM certificados c
+                LEFT JOIN usuarios us ON us.id = c.enviado_por
+                WHERE c.empresa_id=%s ORDER BY c.id DESC""", (empresa_id,))
+
+
 @router.get("/empresa/{empresa_id}")
 def historico(empresa_id: int, u=Depends(auth.usuario_atual)):
     auth.exige_empresa(u, empresa_id)

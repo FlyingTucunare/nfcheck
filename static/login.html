@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>NFCheck — Entrar</title>
 <link rel="icon" href="/static/logo.svg">
-<link rel="stylesheet" href="/static/base.css?v=20260810013309">
+<link rel="stylesheet" href="/static/base.css?v=20260813013235">
 <style>
   body{display:flex;min-height:100vh}
   .painel{flex:1;background:var(--tinta);display:flex;flex-direction:column;
@@ -16,10 +16,20 @@
   .lado{width:480px;display:flex;align-items:center;justify-content:center;padding:40px}
   .caixa{width:100%;max-width:340px}
   .caixa h2{font-size:22px;font-weight:600;margin:0 0 6px}
-  .caixa .sub{color:var(--cinza);font-size:14px;margin:0 0 28px}
+  .caixa .sub{color:var(--cinza);font-size:14px;margin:0 0 28px;line-height:1.55}
   .grupo{margin-bottom:16px}
   .btn-primario{width:100%;margin-top:8px}
   .rodape{margin-top:28px;font-size:12px;color:var(--cinza);text-align:center}
+  .voltar{background:none;border:0;color:var(--cinza);font:inherit;font-size:13px;
+    cursor:pointer;padding:0;margin-top:14px;width:100%;text-align:center}
+  .voltar:hover{color:var(--tinta)}
+  .codigo{font-family:ui-monospace,Menlo,monospace;font-size:22px;letter-spacing:.4em;
+    text-align:center}
+  .regras{font-size:12px;color:var(--cinza);line-height:1.9;margin:10px 0 0;
+    padding-left:18px}
+  .regras li.ok{color:#1F7A44}
+  .etapa{display:none}
+  .etapa.on{display:block}
   @media(max-width:900px){.painel{display:none}.lado{width:100%}}
 </style>
 </head>
@@ -46,49 +56,166 @@
 
   <div class="lado">
     <div class="caixa">
-      <h2>Entrar</h2>
-      <p class="sub">Acesse com seu e-mail e senha.</p>
-
       <div class="alerta alerta-erro" id="erro"></div>
 
-      <div class="grupo">
-        <label class="rotulo" for="email">E-mail</label>
-        <input class="campo" type="email" id="email" autocomplete="username" autofocus>
-      </div>
-      <div class="grupo">
-        <label class="rotulo" for="senha">Senha</label>
-        <input class="campo" type="password" id="senha" autocomplete="current-password">
-      </div>
+      <!-- etapa 1: e-mail e senha -->
+      <form class="etapa on" id="e-login" onsubmit="return false">
+        <h2>Entrar</h2>
+        <p class="sub">Acesse com seu e-mail e senha.</p>
+        <div class="grupo">
+          <label class="rotulo" for="email">E-mail</label>
+          <input class="campo" type="email" id="email" autocomplete="username" autofocus>
+        </div>
+        <div class="grupo">
+          <label class="rotulo" for="senha">Senha</label>
+          <input class="campo" type="password" id="senha" autocomplete="current-password">
+        </div>
+        <button class="btn btn-primario" id="btn" type="submit">Entrar</button>
+      </form>
 
-      <button class="btn btn-primario" id="btn">Entrar</button>
+      <!-- etapa 2: codigo do 2FA -->
+      <form class="etapa" id="e-2fa" onsubmit="return false">
+        <h2>Verificação em duas etapas</h2>
+        <p class="sub">Digite o código de 6 dígitos do seu aplicativo
+          autenticador. Se perdeu o acesso, use um código de recuperação.</p>
+        <div class="grupo">
+          <label class="rotulo" for="codigo">Código</label>
+          <input class="campo codigo" id="codigo" inputmode="numeric"
+            autocomplete="one-time-code" maxlength="11" placeholder="000000">
+        </div>
+        <button class="btn btn-primario" id="btn-2fa" type="submit">Confirmar</button>
+        <button class="voltar" id="volta-1" type="button">Voltar</button>
+      </form>
+
+      <!-- etapa 3: troca obrigatoria de senha -->
+      <form class="etapa" id="e-troca" onsubmit="return false">
+        <h2>Crie sua senha</h2>
+        <p class="sub">Sua senha atual foi definida por outra pessoa. Para
+          proteger sua conta, escolha uma senha que só você conheça.</p>
+        <div class="grupo">
+          <label class="rotulo" for="nova">Nova senha</label>
+          <input class="campo" type="password" id="nova" autocomplete="new-password">
+          <ul class="regras" id="regras">
+            <li data-r="tam">Pelo menos 10 caracteres</li>
+            <li data-r="letra">Ao menos uma letra</li>
+            <li data-r="num">Ao menos um número</li>
+          </ul>
+        </div>
+        <div class="grupo">
+          <label class="rotulo" for="nova2">Repita a nova senha</label>
+          <input class="campo" type="password" id="nova2" autocomplete="new-password">
+        </div>
+        <button class="btn btn-primario" id="btn-troca" type="submit">Salvar e entrar</button>
+      </form>
+
       <p class="rodape">NFCheck · Órbita Softwares e Integrações</p>
     </div>
   </div>
 
 <script>
 const $ = s => document.querySelector(s);
-const erro = m => { const e=$('#erro'); e.textContent=m; e.style.display=m?'block':'none'; };
+const erro = m => { const e = $('#erro'); e.textContent = m || '';
+  e.style.display = m ? 'block' : 'none'; };
+let TOKEN_PARCIAL = null, TOKEN = null, USUARIO = null, SENHA_ATUAL = '';
+
+function etapa(id){
+  document.querySelectorAll('.etapa').forEach(e => e.classList.remove('on'));
+  $('#' + id).classList.add('on');
+  erro('');
+  const foco = {'e-login':'#email', 'e-2fa':'#codigo', 'e-troca':'#nova'}[id];
+  setTimeout(() => { const el = $(foco); if (el) el.focus(); }, 60);
+}
+
+function guarda(d){
+  sessionStorage.setItem('nfc_token', d.token);
+  sessionStorage.setItem('nfc_usuario', JSON.stringify(d.usuario));
+  TOKEN = d.token; USUARIO = d.usuario;
+}
 
 async function entrar(){
   erro('');
-  const email=$('#email').value.trim(), senha=$('#senha').value;
-  if(!email||!senha){ erro('Preencha e-mail e senha.'); return; }
-  const b=$('#btn'); b.disabled=true; b.textContent='Entrando...';
-  try{
-    const r=await fetch('/api/login',{method:'POST',
+  const email = $('#email').value.trim(), senha = $('#senha').value;
+  if (!email || !senha){ erro('Preencha e-mail e senha.'); return; }
+  const b = $('#btn'); b.disabled = true; b.textContent = 'Entrando...';
+  try {
+    const r = await fetch('/api/login', {method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({email,senha})});
-    const d=await r.json();
-    if(!r.ok){ erro(d.detail||'Nao foi possivel entrar.'); return; }
-    sessionStorage.setItem('nfc_token',d.token);
-    sessionStorage.setItem('nfc_usuario',JSON.stringify(d.usuario));
-    location.href='/painel';
-  }catch(e){ erro('Falha de conexao. Tente novamente.'); }
-  finally{ b.disabled=false; b.textContent='Entrar'; }
+      body: JSON.stringify({email, senha})});
+    const d = await r.json();
+    if (!r.ok){ erro(d.detail || 'Nao foi possivel entrar.'); return; }
+
+    if (d.precisa_totp){ TOKEN_PARCIAL = d.token_parcial; etapa('e-2fa'); return; }
+
+    SENHA_ATUAL = senha;
+    guarda(d);
+    if (d.trocar_senha) etapa('e-troca');
+    else location.href = '/painel';
+  } catch(e){ erro('Falha de conexao. Tente novamente.'); }
+  finally { b.disabled = false; b.textContent = 'Entrar'; }
 }
-$('#btn').addEventListener('click',entrar);
-['email','senha'].forEach(id=>$('#'+id)
-  .addEventListener('keydown',e=>{ if(e.key==='Enter') entrar(); }));
+
+async function confirma2fa(){
+  erro('');
+  const codigo = $('#codigo').value.trim();
+  if (!codigo){ erro('Digite o codigo.'); return; }
+  const b = $('#btn-2fa'); b.disabled = true; b.textContent = 'Verificando...';
+  try {
+    const r = await fetch('/api/login/2fa', {method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({token_parcial: TOKEN_PARCIAL, codigo})});
+    const d = await r.json();
+    if (!r.ok){ erro(d.detail || 'Codigo invalido.'); return; }
+    SENHA_ATUAL = $('#senha').value;
+    guarda(d);
+    if (d.trocar_senha) etapa('e-troca');
+    else location.href = '/painel';
+  } catch(e){ erro('Falha de conexao. Tente novamente.'); }
+  finally { b.disabled = false; b.textContent = 'Confirmar'; }
+}
+
+function conferaRegras(){
+  const s = $('#nova').value;
+  const regras = {tam: s.length >= 10,
+                  letra: /[a-zA-Z]/.test(s),
+                  num: /[0-9]/.test(s)};
+  Object.entries(regras).forEach(([k, ok]) => {
+    const li = document.querySelector('[data-r="' + k + '"]');
+    if (li) li.classList.toggle('ok', ok);
+  });
+  return Object.values(regras).every(Boolean);
+}
+
+async function trocaSenha(){
+  erro('');
+  const nova = $('#nova').value, nova2 = $('#nova2').value;
+  if (!conferaRegras()){ erro('A senha nao atende aos requisitos.'); return; }
+  if (nova !== nova2){ erro('As senhas nao conferem.'); return; }
+  const b = $('#btn-troca'); b.disabled = true; b.textContent = 'Salvando...';
+  try {
+    const r = await fetch('/api/senha/trocar', {method:'POST',
+      headers:{'Content-Type':'application/json',
+               'Authorization':'Bearer ' + TOKEN},
+      body: JSON.stringify({senha_atual: SENHA_ATUAL, senha_nova: nova})});
+    const d = await r.json();
+    if (!r.ok){ erro(d.detail || 'Nao foi possivel trocar a senha.'); return; }
+    location.href = '/painel';
+  } catch(e){ erro('Falha de conexao. Tente novamente.'); }
+  finally { b.disabled = false; b.textContent = 'Salvar e entrar'; }
+}
+
+$('#btn').addEventListener('click', entrar);
+$('#btn-2fa').addEventListener('click', confirma2fa);
+$('#btn-troca').addEventListener('click', trocaSenha);
+$('#volta-1').addEventListener('click', () => {
+  TOKEN_PARCIAL = null; $('#codigo').value = ''; etapa('e-login');
+});
+$('#nova').addEventListener('input', conferaRegras);
+
+['email','senha'].forEach(id => $('#' + id)
+  .addEventListener('keydown', e => { if (e.key === 'Enter') entrar(); }));
+$('#codigo').addEventListener('keydown', e => { if (e.key === 'Enter') confirma2fa(); });
+['nova','nova2'].forEach(id => $('#' + id)
+  .addEventListener('keydown', e => { if (e.key === 'Enter') trocaSenha(); }));
 </script>
 </body>
 </html>

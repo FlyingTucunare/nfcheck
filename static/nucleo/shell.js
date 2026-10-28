@@ -5,7 +5,15 @@ const MODULOS = [
   {id:'dfe',        rota:'/e/dfe',        nome:'Documentos',   icone:'arquivo',
    perm:'ver',    desc:'NF-e, CT-e e NFS-e recebidas'},
   {id:'emissao',    rota:'/e/emissao',    nome:'Emitir NFS-e', icone:'subir',
-   perm:'emitir', desc:'Emissor Nacional'},
+   perm:'emitir', desc:'NFS-e do municipio ou Emissor Nacional'},
+  {id:'nfse-config',rota:'/e/nfse-config',nome:'Config. NFS-e', icone:'engrenagem',
+   perm:'emitir', desc:'Serie, numeracao e regras de emissao'},
+  {id:'notas',      rota:'/e/notas',      nome:'Notas emitidas', icone:'arquivo',
+   perm:'ver',    desc:'NFS-e emitidas por esta empresa'},
+  {id:'servicos',   rota:'/e/servicos',   nome:'Servicos',     icone:'lista',
+   perm:'emitir', desc:'Modelos de servico para emissao'},
+  {id:'tomadores',  rota:'/e/tomadores',  nome:'Tomadores',    icone:'usuarios',
+   perm:'emitir', desc:'Clientes que recebem as notas'},
   {id:'importacao', rota:'/e/importacao', nome:'Importar',     icone:'subir',
    perm:'importar', desc:'XML e PDF em lote'},
   {id:'exportacao', rota:'/e/exportacao', nome:'Exportar',     icone:'baixar',
@@ -78,9 +86,9 @@ const Shell = {
             'aria-label="Alternar tema"></button>' +
           Shell._menuEscritorio() +
           '<div class="shell-eu">' +
-            '<span class="so-largo">' + Fmt.escapa(u.nome || '') + '</span>' +
-            '<button class="btn btn-3 btn-icone shell-btn" id="shell-sair" ' +
-              'aria-label="Sair">' + Icone.sair + '</button>' +
+            '<button class="btn btn-3 shell-btn" id="shell-eu-btn">' +
+              '<span class="so-largo">' + Fmt.escapa(u.nome || '') + '</span>' +
+              Icone.pontos + '</button>' +
           '</div>' +
         '</div>' +
       '</div>';
@@ -90,7 +98,15 @@ const Shell = {
       Tema.atual() === 'claro' ? Icone.lua : Icone.sol;
     pinta();
     $('#shell-tema').onclick = () => { Tema.alterna(); pinta(); };
-    $('#shell-sair').onclick = () => Sessao.sai();
+    $('#shell-eu-btn').onclick = ev => {
+      ev.stopPropagation();
+      Menu.abre($('#shell-eu-btn'), [
+        {txt:'Segurança da conta', icone:'escudo',
+         fn:() => location.href = '/conta/seguranca'},
+        {sep:true},
+        {txt:'Sair', icone:'sair', fn:() => Sessao.sai()},
+      ]);
+    };
 
     const menu = $('#shell-menu');
     if (menu) {

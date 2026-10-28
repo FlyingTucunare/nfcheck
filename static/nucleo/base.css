@@ -220,3 +220,11 @@ table.dados input[type=checkbox]{cursor:pointer;width:15px;height:15px;
 .barra-sel .btn-2:hover{background:rgba(255,255,255,.2)}
 .barra-sel .btn-3{color:#9DB4CC}
 .barra-sel .btn-3:hover{background:rgba(255,255,255,.1);color:#fff}
+
+/* seletor de itens por pagina */
+.paginacao .qtd-itens{display:flex;align-items:center;gap:6px;
+  font-size:var(--t-xs);color:var(--txt-3)}
+.paginacao .qtd-itens select{font:inherit;font-size:var(--t-xs);
+  padding:3px 6px;border:1px solid var(--linha);border-radius:var(--r-sm);
+  background:var(--sup-1);color:var(--txt);cursor:pointer}
+.paginacao .qtd-itens select:hover{border-color:var(--linha-forte)}

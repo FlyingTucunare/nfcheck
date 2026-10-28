@@ -19,6 +19,8 @@ WS = {
     "wsdl": "http://www.portalfiscal.inf.br/nfe/wsdl/NFeDistribuicaoDFe",
     "ns": "http://www.portalfiscal.inf.br/nfe",
     "op": "nfeDistDFeInteresse",
+    "msg": "nfeDadosMsg",
+    "versao": "1.01",
   },
   "sefaz_cte": {
     "url": {"1": "https://www1.cte.fazenda.gov.br/CTeDistribuicaoDFe/CTeDistribuicaoDFe.asmx",
@@ -26,6 +28,8 @@ WS = {
     "wsdl": "http://www.portalfiscal.inf.br/cte/wsdl/CTeDistribuicaoDFe",
     "ns": "http://www.portalfiscal.inf.br/cte",
     "op": "cteDistDFeInteresse",
+    "msg": "cteDadosMsg",
+    "versao": "1.00",
   },
 }
 
@@ -86,14 +90,36 @@ def _envelope(origem, ambiente, cuf, cnpj, ult_nsu):
 <soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
  <soap12:Body>
   <{w['op']} xmlns="{w['wsdl']}">
-   <nfeDadosMsg>
-    <distDFeInt xmlns="{w['ns']}" versao="1.01">
+   <{w['msg']}>
+    <distDFeInt xmlns="{w['ns']}" versao="{w['versao']}">
      <tpAmb>{ambiente}</tpAmb>
      <cUFAutor>{cuf}</cUFAutor>
      <CNPJ>{cnpj}</CNPJ>
      <distNSU><ultNSU>{str(ult_nsu).zfill(15)}</ultNSU></distNSU>
     </distDFeInt>
-   </nfeDadosMsg>
+   </{w['msg']}>
+  </{w['op']}>
+ </soap12:Body>
+</soap12:Envelope>"""
+
+
+def _envelope_chave(ambiente, cuf, cnpj, chave):
+    """consChNFe: recupera uma NF-e especifica. Para o destinatario, o
+    Ambiente Nacional so devolve o documento COMPLETO se ja houver
+    manifestacao; sem ela, devolve o resumo de novo."""
+    w = WS["sefaz_nfe"]
+    return f"""<?xml version="1.0" encoding="utf-8"?>
+<soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
+ <soap12:Body>
+  <{w['op']} xmlns="{w['wsdl']}">
+   <{w['msg']}>
+    <distDFeInt xmlns="{w['ns']}" versao="{w['versao']}">
+     <tpAmb>{ambiente}</tpAmb>
+     <cUFAutor>{cuf}</cUFAutor>
+     <CNPJ>{cnpj}</CNPJ>
+     <consChNFe><chNFe>{chave}</chNFe></consChNFe>
+    </distDFeInt>
+   </{w['msg']}>
   </{w['op']}>
  </soap12:Body>
 </soap12:Envelope>"""
@@ -158,7 +184,17 @@ def _grava(d, xml_bytes):
       VALUES (%(empresa_id)s,%(chave)s,%(nsu)s,%(origem)s,%(tipo)s,%(schema_xml)s,
               %(emitente_cnpj)s,%(emitente_nome)s,%(destinatario_cnpj)s,%(numero)s,
               %(serie)s,%(emissao)s,%(valor)s,%(situacao)s,%(resumo)s,%(xml_path)s)
-      ON CONFLICT (empresa_id,chave,tipo) DO NOTHING""",
+      ON CONFLICT (empresa_id,chave,tipo) DO UPDATE SET
+         resumo   = EXCLUDED.resumo,
+         xml_path = EXCLUDED.xml_path,
+         nsu      = COALESCE(EXCLUDED.nsu, documentos.nsu),
+         valor    = COALESCE(EXCLUDED.valor, documentos.valor),
+         numero   = COALESCE(EXCLUDED.numero, documentos.numero),
+         serie    = COALESCE(EXCLUDED.serie, documentos.serie),
+         emissao  = COALESCE(EXCLUDED.emissao, documentos.emissao),
+         situacao = COALESCE(EXCLUDED.situacao, documentos.situacao),
+         schema_xml = EXCLUDED.schema_xml
+       WHERE documentos.resumo AND NOT EXCLUDED.resumo""",
       {**d, "xml_path": str(caminho)})
 
 
@@ -169,6 +205,73 @@ def _log(empresa_id, origem, cstat, motivo, nsu_ini, nsu_fim, novos, t0):
          VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""",
       (empresa_id, origem, cstat, (motivo or "")[:300], nsu_ini, nsu_fim, novos,
        int((time.monotonic() - t0) * 1000)))
+
+
+def consultar_chave(empresa_id, chave, ambiente="1"):
+    """Busca o XML completo de uma NF-e pela chave (consChNFe).
+
+    Usar com parcimonia: o limite da SEFAZ e de 20 consultas por hora por
+    CNPJ, somando consChNFe e consNSU. Estourar da cStat 656 e bloqueia o
+    CNPJ por uma hora - inclusive para o distNSU.
+
+    Retorna dict com cstat, novos e completo (True quando o documento veio
+    inteiro, nao so o resumo).
+    """
+    ini = time.monotonic()
+    emp = q("SELECT cnpj, uf FROM empresas WHERE id=%s", (empresa_id,), one=True)
+    if not emp:
+        return {"halt": True, "mensagem": "empresa inexistente"}
+
+    cuf = UF_COD.get((emp["uf"] or "SP").upper(), 35)
+    corpo = _envelope_chave(ambiente, cuf, emp["cnpj"], chave)
+
+    with CertTemp(empresa_id) as (c, k):
+        try:
+            r = requests.post(WS["sefaz_nfe"]["url"][ambiente],
+                              data=corpo.encode("utf-8"),
+                              headers={"Content-Type":
+                                       "application/soap+xml; charset=utf-8"},
+                              cert=(c, k), timeout=60)
+            r.raise_for_status()
+        except Exception as e:
+            _log(empresa_id, "conschnfe", "ERRO", str(e)[:300], None, None, 0, ini)
+            return {"halt": True, "mensagem": str(e)[:200]}
+
+    raiz = etree.fromstring(r.content)
+    cstat = _txt(raiz, "cStat", "")
+    motivo = _txt(raiz, "xMotivo", "")
+
+    # 656 aqui bloqueia o CNPJ inteiro, inclusive o distNSU
+    if cstat == "656":
+        q("""UPDATE cursores_dfe SET pausado=TRUE, pausado_motivo=%s,
+               ultimo_cstat=%s WHERE empresa_id=%s""",
+          ("Consumo indevido (656) na consulta por chave. Aguarde 1 hora.",
+           cstat, empresa_id))
+        _log(empresa_id, "conschnfe", cstat, motivo, None, None, 0, ini)
+        return {"halt": True, "cstat": cstat, "mensagem": motivo}
+
+    novos = completo = 0
+    for doc in raiz.findall(".//{*}docZip"):
+        nsu_doc = doc.get("NSU")
+        try:
+            xml_bytes = gzip.decompress(base64.b64decode(doc.text))
+        except Exception:
+            continue
+        d = _extrai_doc(xml_bytes, nsu_doc, empresa_id, "sefaz_nfe")
+        if not d:
+            continue
+        d["schema_xml"] = doc.get("schema") or d.get("schema_xml")
+        try:
+            _grava(d, xml_bytes)
+            novos += 1
+            if not d.get("resumo"):
+                completo += 1
+        except Exception:
+            continue
+
+    _log(empresa_id, "conschnfe", cstat, motivo, None, None, novos, ini)
+    return {"cstat": cstat, "motivo": motivo, "novos": novos,
+            "completo": bool(completo)}
 
 
 def sincronizar(empresa_id, origem, ambiente="1"):

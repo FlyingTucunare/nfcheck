@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NFCheck — Emitir NFS-e</title>
+<link rel="icon" href="/static/logo.svg">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/nucleo/tokens.css?v=20260814022400">
+<link rel="stylesheet" href="/static/nucleo/base.css?v=20260814022400">
+<link rel="stylesheet" href="/static/nucleo/shell.css?v=20260814022400">
+<style>
+  .colunas-emissao{display:grid;grid-template-columns:1fr 380px;gap:var(--e-5);
+    align-items:start}
+  @media (max-width:1100px){.colunas-emissao{grid-template-columns:1fr}}
+  .campo-grupo{margin-bottom:var(--e-4)}
+  .dica{font-size:var(--t-xs);color:var(--txt-3);margin-top:5px;line-height:1.45}
+  .grade2{display:grid;grid-template-columns:1fr 1fr;gap:var(--e-4)}
+  .grade3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--e-4)}
+  .secao{background:var(--sup-1);border:1px solid var(--linha);
+    border-radius:var(--r-lg);padding:var(--e-5);margin-bottom:var(--e-4)}
+  .secao h2{font-size:var(--t-md);margin:0 0 var(--e-4);display:flex;
+    align-items:center;gap:8px}
+  .secao h2 .n{width:22px;height:22px;border-radius:50%;background:var(--marca-azul);
+    color:#fff;display:inline-flex;align-items:center;justify-content:center;
+    font-size:11px;font-weight:var(--p-forte);flex:none}
+  .linha-tom{display:flex;gap:var(--e-3);align-items:flex-end}
+  .linha-tom .campo-grupo{flex:1;margin:0}
+  .escolhido{background:var(--sup-2);border:1px solid var(--linha);
+    border-radius:var(--r);padding:var(--e-3) var(--e-4);display:flex;
+    justify-content:space-between;align-items:center;gap:var(--e-4)}
+  .escolhido .nome{font-weight:var(--p-forte)}
+  .escolhido .sub{font-size:var(--t-xs);color:var(--txt-3);
+    font-family:var(--fonte-num);margin-top:2px}
+  .retencoes{border-top:1px solid var(--linha);margin-top:var(--e-4);
+    padding-top:var(--e-4)}
+  .alternar{background:none;border:0;color:var(--acao);cursor:pointer;
+    font:inherit;font-size:var(--t-sm);font-weight:var(--p-forte);padding:0;
+    display:flex;align-items:center;gap:6px}
+
+  .resumo{position:sticky;top:var(--e-5);background:var(--sup-1);
+    border:1px solid var(--linha);border-radius:var(--r-lg);overflow:hidden}
+  .resumo .cab{background:var(--marca-tinta);color:#fff;padding:var(--e-4) var(--e-5)}
+  .resumo .cab .r{font-size:var(--t-xs);opacity:.75;text-transform:uppercase;
+    letter-spacing:.06em}
+  .resumo .cab .v{font-size:var(--t-md);font-weight:var(--p-forte);margin-top:2px}
+  .resumo .corpo{padding:var(--e-5)}
+  .rl{display:flex;justify-content:space-between;gap:var(--e-4);padding:5px 0;
+    font-size:var(--t-sm);border-bottom:1px dotted var(--linha)}
+  .rl:last-child{border-bottom:none}
+  .rl span{color:var(--txt-3)}
+  .rl b{font-family:var(--fonte-num);text-align:right}
+  .rl.neg b{color:var(--erro)}
+  .liquido{background:var(--marca-tinta);color:#fff;padding:var(--e-4) var(--e-5);
+    display:flex;justify-content:space-between;align-items:center}
+  .liquido .r{font-size:var(--t-xs);opacity:.8;text-transform:uppercase;
+    letter-spacing:.06em}
+  .liquido .n{font-family:var(--fonte-num);font-size:22px;font-weight:var(--p-forte)}
+  .resumo .rodape{padding:var(--e-4) var(--e-5);border-top:1px solid var(--linha)}
+  .vazio-resumo{color:var(--txt-3);font-size:var(--t-sm);text-align:center;
+    padding:var(--e-6) 0;line-height:1.6}
+
+  .pendencias{background:var(--erro-fundo);border:1px solid var(--erro-borda);
+    border-radius:var(--r-lg);padding:var(--e-5);margin-bottom:var(--e-5)}
+  .pendencias h3{font-size:var(--t-md);margin:0 0 var(--e-3);color:var(--erro)}
+  .pendencias ul{margin:0;padding-left:20px;line-height:1.7;font-size:var(--t-sm)}
+
+  .sucesso{text-align:center;padding:var(--e-6) var(--e-5)}
+  .sucesso .ic{width:56px;height:56px;border-radius:50%;background:var(--ok-fundo);
+    color:var(--ok);display:flex;align-items:center;justify-content:center;
+    margin:0 auto var(--e-4)}
+  .sucesso h2{margin:0 0 var(--e-2)}
+  .sucesso .num{font-family:var(--fonte-num);font-size:34px;font-weight:var(--p-forte);
+    line-height:1.1;margin:var(--e-3) 0}
+  .sucesso .cod{font-family:var(--fonte-num);font-size:var(--t-md);color:var(--txt-2)}
+  .sucesso .acoes{display:flex;gap:var(--e-3);justify-content:center;
+    margin-top:var(--e-5);flex-wrap:wrap}
+</style>
+</head>
+<body>
+<div class="pagina">
+  <div class="pag-cab">
+    <div><h1>Emitir NFS-e</h1>
+      <p id="sub">Nota Fiscal de Serviços Eletrônica.</p></div>
+    <button class="btn btn-2" id="ver-notas"></button>
+  </div>
+
+  <div class="aviso aviso-erro" id="erro"></div>
+  <div id="bloqueio"></div>
+
+  <div class="colunas-emissao" id="area">
+    <div>
+      <div class="secao">
+        <h2><span class="n">1</span>Tomador</h2>
+        <div id="bloco-tomador"></div>
+      </div>
+
+      <div class="secao">
+        <h2><span class="n">2</span>Serviço</h2>
+        <div class="campo-grupo">
+          <select class="campo" id="f-servico"></select>
+          <div class="dica" id="dica-servico"></div>
+        </div>
+        <div class="campo-grupo">
+          <label class="rotulo">Descrição que sai na nota</label>
+          <textarea class="campo" id="f-descricao" maxlength="2000"></textarea>
+        </div>
+      </div>
+
+      <div class="secao">
+        <h2><span class="n">3</span>Valores</h2>
+        <div class="grade3">
+          <div class="campo-grupo">
+            <label class="rotulo">Valor do serviço (R$)</label>
+            <input class="campo" id="f-valor" type="number" step="0.01" min="0.01">
+          </div>
+          <div class="campo-grupo">
+            <label class="rotulo">Competência</label>
+            <input class="campo" id="f-competencia" type="month">
+            <div class="dica">Mês de referência do serviço.</div>
+          </div>
+          <div class="campo-grupo">
+            <label class="rotulo">ISS retido pelo tomador</label>
+            <select class="campo" id="f-retido">
+              <option value="0">Não</option>
+              <option value="1">Sim</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="retencoes">
+          <button class="alternar" id="b-retencoes" type="button"></button>
+          <div id="box-retencoes" style="display:none;margin-top:var(--e-4)">
+            <div class="grade3">
+              <div class="campo-grupo"><label class="rotulo">Deduções (R$)</label>
+                <input class="campo ret" id="f-deducoes" type="number" step="0.01" min="0"></div>
+              <div class="campo-grupo"><label class="rotulo">Desconto incondicionado (R$)</label>
+                <input class="campo ret" id="f-desconto" type="number" step="0.01" min="0"></div>
+              <div class="campo-grupo"><label class="rotulo">PIS (R$)</label>
+                <input class="campo ret" id="f-pis" type="number" step="0.01" min="0"></div>
+              <div class="campo-grupo"><label class="rotulo">COFINS (R$)</label>
+                <input class="campo ret" id="f-cofins" type="number" step="0.01" min="0"></div>
+              <div class="campo-grupo"><label class="rotulo">INSS (R$)</label>
+                <input class="campo ret" id="f-inss" type="number" step="0.01" min="0"></div>
+              <div class="campo-grupo"><label class="rotulo">IR (R$)</label>
+                <input class="campo ret" id="f-ir" type="number" step="0.01" min="0"></div>
+              <div class="campo-grupo"><label class="rotulo">CSLL (R$)</label>
+                <input class="campo ret" id="f-csll" type="number" step="0.01" min="0"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="resumo" id="resumo"></div>
+  </div>
+</div>
+
+<script src="/static/nucleo/app.js?v=20260814022400"></script>
+<script src="/static/nucleo/shell.js?v=20260827090000"></script>
+<script src="/static/modulos/emissao.js?v=20260827090000"></script>
+</body>
+</html>

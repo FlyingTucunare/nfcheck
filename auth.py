@@ -37,6 +37,26 @@ def cria_token(u):
     return jwt.encode({"sub": str(u["id"]), "perfil": u["perfil"],
                        "cont": u["contabilidade_id"], "exp": exp}, JWT_SECRET, algorithm=ALGO)
 
+def cria_token_parcial(usuario_id, minutos=5):
+    """Token curto que prova apenas que a SENHA foi validada, enquanto o
+    usuario digita o codigo do 2FA. Nao serve para acessar nada: o
+    usuario_atual() recusa tokens com escopo '2fa'."""
+    exp = datetime.now(timezone.utc) + timedelta(minutes=minutos)
+    return jwt.encode({"sub": str(usuario_id), "escopo": "2fa", "exp": exp},
+                      JWT_SECRET, algorithm=ALGO)
+
+
+def le_token_parcial(token):
+    """Devolve o id do usuario, ou None se o token for invalido/expirado."""
+    try:
+        p = jwt.decode(token, JWT_SECRET, algorithms=[ALGO])
+    except JWTError:
+        return None
+    if p.get("escopo") != "2fa":
+        return None
+    return int(p["sub"])
+
+
 def usuario_atual(request: Request):
     h = request.headers.get("Authorization", "")
     if not h.startswith("Bearer "):
@@ -45,8 +65,10 @@ def usuario_atual(request: Request):
         p = jwt.decode(h[7:], JWT_SECRET, algorithms=[ALGO])
     except JWTError:
         raise HTTPException(401, "Token invalido ou expirado")
-    u = q("SELECT id,nome,email,perfil,contabilidade_id,ativo FROM usuarios WHERE id=%s",
-          (int(p["sub"]),), one=True)
+    if p.get("escopo") == "2fa":
+        raise HTTPException(401, "Verificacao em duas etapas pendente")
+    u = q("""SELECT id,nome,email,perfil,contabilidade_id,ativo,senha_provisoria
+             FROM usuarios WHERE id=%s""", (int(p["sub"]),), one=True)
     if not u or not u["ativo"]:
         raise HTTPException(401, "Usuario inativo")
     return u

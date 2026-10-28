@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NFCheck — Segurança da conta</title>
+<link rel="icon" href="/static/logo.svg">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/nucleo/tokens.css?v=20260813013615">
+<link rel="stylesheet" href="/static/nucleo/base.css?v=20260813013615">
+<link rel="stylesheet" href="/static/nucleo/shell.css?v=20260813013615">
+<style>
+  .colunas-seg{display:grid;grid-template-columns:1fr 1fr;gap:var(--e-5);
+    align-items:start}
+  @media(max-width:980px){.colunas-seg{grid-template-columns:1fr}}
+  .cartao-seg{background:var(--sup-1);border:1px solid var(--linha);
+    border-radius:var(--r-lg);padding:var(--e-5)}
+  .cartao-seg h2{font-size:var(--t-lg);margin:0 0 var(--e-2)}
+  .cartao-seg .desc{color:var(--txt-2);font-size:var(--t-sm);line-height:1.6;
+    margin-bottom:var(--e-5)}
+  .campo-grupo{margin-bottom:var(--e-4)}
+  .dica{font-size:var(--t-xs);color:var(--txt-3);margin-top:5px;line-height:1.45}
+  .regras{font-size:var(--t-xs);color:var(--txt-3);line-height:1.9;
+    margin:8px 0 0;padding-left:18px}
+  .regras li.ok{color:var(--ok)}
+  .estado{display:flex;align-items:center;gap:var(--e-3);
+    padding:var(--e-4);border-radius:var(--r);margin-bottom:var(--e-4)}
+  .estado.ativo{background:var(--ok-fundo);border:1px solid var(--ok-borda)}
+  .estado.inativo{background:var(--aviso-fundo);border:1px solid var(--aviso-borda)}
+  .estado .txt{font-size:var(--t-sm);line-height:1.5}
+  .estado .txt b{display:block;font-size:var(--t-md)}
+  .qr{background:#fff;border:1px solid var(--linha);border-radius:var(--r);
+    padding:var(--e-4);width:210px;margin:0 auto var(--e-4)}
+  .qr svg{width:100%;height:auto;display:block}
+  .segredo{font-family:var(--fonte-num);font-size:var(--t-sm);text-align:center;
+    background:var(--sup-2);border-radius:var(--r);padding:var(--e-3);
+    word-break:break-all;margin-bottom:var(--e-4)}
+  .codigos{display:grid;grid-template-columns:1fr 1fr;gap:var(--e-2);
+    font-family:var(--fonte-num);font-size:var(--t-md);margin:var(--e-4) 0}
+  .codigos div{background:var(--sup-2);border-radius:var(--r);padding:8px 10px;
+    text-align:center}
+  .cod-input{font-family:var(--fonte-num);font-size:20px;letter-spacing:.35em;
+    text-align:center}
+</style>
+</head>
+<body>
+<div class="pagina">
+  <div class="pag-cab">
+    <div><h1>Segurança da conta</h1>
+      <p id="sub">Senha e verificação em duas etapas.</p></div>
+  </div>
+
+  <div class="aviso aviso-erro" id="erro"></div>
+
+  <div class="colunas-seg">
+    <div class="cartao-seg">
+      <h2>Senha</h2>
+      <div class="desc" id="desc-senha">Use uma senha que você não usa em
+        outros sistemas.</div>
+      <form onsubmit="return false">
+        <div class="campo-grupo">
+          <label class="rotulo">Senha atual</label>
+          <input class="campo" type="password" id="s-atual" autocomplete="current-password">
+        </div>
+        <div class="campo-grupo">
+          <label class="rotulo">Nova senha</label>
+          <input class="campo" type="password" id="s-nova" autocomplete="new-password">
+          <ul class="regras" id="regras">
+            <li data-r="tam">Pelo menos 10 caracteres</li>
+            <li data-r="letra">Ao menos uma letra</li>
+            <li data-r="num">Ao menos um número</li>
+          </ul>
+        </div>
+        <div class="campo-grupo">
+          <label class="rotulo">Repita a nova senha</label>
+          <input class="campo" type="password" id="s-nova2" autocomplete="new-password">
+        </div>
+        <button class="btn btn-1" id="b-senha" type="submit">Alterar senha</button>
+      </form>
+    </div>
+
+    <div class="cartao-seg">
+      <h2>Verificação em duas etapas</h2>
+      <div class="desc">Além da senha, o acesso passa a pedir um código gerado
+        no seu celular. É a proteção mais eficaz contra senha vazada — e este
+        sistema guarda certificados digitais.</div>
+      <div id="area-2fa"></div>
+    </div>
+  </div>
+</div>
+
+<script src="/static/nucleo/app.js?v=20260813013615"></script>
+<script src="/static/nucleo/shell.js?v=20260827090000"></script>
+<script src="/static/modulos/conta-seguranca.js?v=20260813013615"></script>
+</body>
+</html>
